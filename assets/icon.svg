@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1F1F4"/>
+    </linearGradient>
+    <clipPath id="sq"><rect x="64" y="64" width="896" height="896" rx="200"/></clipPath>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <rect x="64" y="64" width="896" height="230" fill="#FF3B30" clip-path="url(#sq)"/>
+  <g fill="#C7C7CC">
+    <circle cx="262" cy="440" r="40"/><circle cx="412" cy="440" r="40"/><circle cx="612" cy="440" r="40"/><circle cx="762" cy="440" r="40"/>
+    <circle cx="262" cy="600" r="40"/><circle cx="412" cy="600" r="40"/><circle cx="762" cy="600" r="40"/>
+    <circle cx="262" cy="760" r="40"/><circle cx="412" cy="760" r="40"/><circle cx="612" cy="760" r="40"/><circle cx="762" cy="760" r="40"/>
+  </g>
+  <circle cx="612" cy="600" r="78" fill="#FF3B30"/>
+  <circle cx="612" cy="600" r="30" fill="#FFFFFF"/>
+</svg>

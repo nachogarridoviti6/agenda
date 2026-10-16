@@ -1,0 +1,149 @@
+/* Tokens de diseño compartidos por la app y el widget (estilo Apple). */
+:root {
+  --font: "Inter Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #f5f5f7;
+  --bg-input: #f2f2f7;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --text-3: #aeaeb2;
+  --line: #e5e5ea;
+  --line-soft: #f0f0f3;
+  --hover: rgba(0, 0, 0, 0.045);
+  --active: rgba(0, 0, 0, 0.08);
+  --red: #ff3b30;
+  --accent: #007aff;
+  --weekend: rgba(0, 0, 0, 0.018);
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --ev-bg-mix: 17%;
+  --ev-text-mix: 62%;
+  --ev-text-base: #1d1d1f;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1e;
+    --bg-elev: #2c2c2e;
+    --bg-sidebar: #232325;
+    --bg-input: #3a3a3c;
+    --text: #f5f5f7;
+    --text-2: #a1a1a6;
+    --text-3: #636366;
+    --line: #38383a;
+    --line-soft: #2a2a2c;
+    --hover: rgba(255, 255, 255, 0.06);
+    --active: rgba(255, 255, 255, 0.1);
+    --red: #ff453a;
+    --accent: #0a84ff;
+    --weekend: rgba(255, 255, 255, 0.015);
+    --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --ev-bg-mix: 30%;
+    --ev-text-mix: 45%;
+    --ev-text-base: #ffffff;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1c1c1e;
+  --bg-elev: #2c2c2e;
+  --bg-sidebar: #232325;
+  --bg-input: #3a3a3c;
+  --text: #f5f5f7;
+  --text-2: #a1a1a6;
+  --text-3: #636366;
+  --line: #38383a;
+  --line-soft: #2a2a2c;
+  --hover: rgba(255, 255, 255, 0.06);
+  --active: rgba(255, 255, 255, 0.1);
+  --red: #ff453a;
+  --accent: #0a84ff;
+  --weekend: rgba(255, 255, 255, 0.015);
+  --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --ev-bg-mix: 30%;
+  --ev-text-mix: 45%;
+  --ev-text-base: #ffffff;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss03";
+  user-select: none;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Color de calendario: el elemento define --c y aquí se derivan fondo pastel, barra y texto. */
+.tint {
+  --c-bg: color-mix(in srgb, var(--c) var(--ev-bg-mix), var(--bg));
+  --c-text: color-mix(in srgb, var(--c) var(--ev-text-mix), var(--ev-text-base));
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  flex: none;
+}
+
+/* Checkbox redondo estilo Recordatorios */
+.check {
+  appearance: none;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--c, var(--text-3));
+  background: transparent;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: background 0.12s;
+}
+.check:checked {
+  background: var(--c, var(--accent));
+}
+.check:checked::after {
+  content: "";
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 1.6px 1.6px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+
+.done {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
