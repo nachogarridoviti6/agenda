@@ -1400,3 +1400,73 @@ kbd {
 .toast.ok {
   background: #34c759;
 }
+
+/* Asistente de conexión con iCloud */
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wizard-intro {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.wizard-step {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-input);
+}
+.wizard-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+}
+.wizard-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+.wizard-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.text-input.wide {
+  width: 100%;
+  max-width: 300px;
+  height: 30px;
+}
+.mono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+.wizard-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.text-input.is-ok {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #34c759 60%, transparent);
+}
+.wizard-ok {
+  color: #34c759;
+  font-weight: 700;
+  font-size: 16px;
+}

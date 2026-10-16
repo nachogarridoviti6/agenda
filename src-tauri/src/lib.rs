@@ -64,6 +64,20 @@ fn app_info(app: AppHandle) -> CmdResult<AppInfo> {
     })
 }
 
+/// Abre una página de ayuda de Apple en el navegador (solo se permiten direcciones de Apple).
+#[tauri::command]
+fn open_apple_page(url: String) -> CmdResult<()> {
+    let allowed = ["https://account.apple.com/", "https://support.apple.com/"];
+    if !allowed.iter().any(|a| url.starts_with(a)) || url.contains(['"', ' ', '&', '|', '^']) {
+        return Err("Dirección no permitida".into());
+    }
+    #[cfg(windows)]
+    let cmd = "explorer";
+    #[cfg(not(windows))]
+    let cmd = "xdg-open";
+    std::process::Command::new(cmd).arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 /// Abre la carpeta de datos en el Explorador.
 #[tauri::command]
 fn open_data_dir(app: AppHandle) -> CmdResult<()> {
@@ -455,6 +469,7 @@ pub fn run() {
             take_pending_ics,
             app_info,
             open_data_dir,
+            open_apple_page,
             list_tasks,
             save_task,
             delete_task,
@@ -475,6 +490,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn solo_abre_paginas_de_apple() {
+        assert!(open_apple_page("https://evil.example/".into()).is_err());
+        assert!(open_apple_page("https://account.apple.com/x\" & calc".into()).is_err());
+    }
 
     #[test]
     fn detecta_ics_en_los_argumentos() {

@@ -11,13 +11,14 @@ test("conectar iCloud (simulado), enlazar calendarios y sincronizar", async ({ p
   await page.getByRole("button", { name: "Ajustes" }).click();
   await dialog(page).getByLabel("Apple ID").fill("nacho@icloud.com");
 
-  // Contraseña normal del Apple ID → error claro
+  // Contraseña normal del Apple ID → aviso y botón desactivado
   await dialog(page).getByLabel("Contraseña específica para apps").fill("MiContraseña2026!");
-  await dialog(page).getByRole("button", { name: "Conectar con iCloud" }).click();
-  await expect(dialog(page)).toContainText("contraseña específica para apps");
+  await expect(dialog(page)).toContainText("Esto parece tu contraseña normal");
+  await expect(dialog(page).getByRole("button", { name: "Conectar con iCloud" })).toBeDisabled();
 
-  // Contraseña específica → conecta; "Trabajo" se enlaza solo porque se llama igual
-  await dialog(page).getByLabel("Contraseña específica para apps").fill("abcd-efgh-ijkl-mnop");
+  // Código pegado en mayúsculas y sin guiones → se normaliza y se marca como válido
+  await dialog(page).getByLabel("Contraseña específica para apps").fill("ABCDEFGHIJKLMNOP");
+  await expect(dialog(page).getByLabel("Código válido")).toBeVisible();
   await dialog(page).getByRole("button", { name: "Conectar con iCloud" }).click();
   await expect(dialog(page)).toContainText("nacho@icloud.com");
   await expect(dialog(page).getByLabel("Sincronizar Trabajo con")).toHaveValue("cal-trabajo");

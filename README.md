@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.0_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.1_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -90,8 +90,13 @@ Escribe una frase y verás una vista previa antes de crearla:
 
 **⚙️ Ajustes → iCloud.**
 
-1. En [account.apple.com](https://account.apple.com) → **Inicio de sesión y seguridad** → **Contraseñas específicas para apps**, crea una (por ejemplo, «Agenda PC»). Hace falta tener activada la verificación en dos pasos.
-2. En Agenda escribe tu Apple ID y esa contraseña (`xxxx-xxxx-xxxx-xxxx`) y pulsa **Conectar con iCloud**. La contraseña se guarda cifrada en el **Administrador de credenciales de Windows**, nunca en un archivo.
+Apple no deja que otras apps usen la contraseña normal de iCloud (pasa igual con Outlook o Thunderbird), así que se crea **una vez** un código solo para Agenda. Un asistente de tres pasos te guía:
+
+1. Escribe tu Apple ID.
+2. **Abrir la página de Apple** → inicia sesión → **Contraseñas específicas para apps** → **+** → nombre «Agenda» → copia el código.
+3. Pégalo como venga (con o sin guiones, en mayúsculas o minúsculas). Si pegas por error tu contraseña normal, Agenda te avisa antes de intentarlo.
+
+El código se guarda cifrado en el **Administrador de credenciales de Windows** y no se vuelve a pedir. Puedes quitarle el acceso a Agenda en cualquier momento desde la web de Apple sin cambiar tu contraseña.
 3. Elige con qué calendario de Agenda se sincroniza cada calendario de iCloud. Los que se llaman igual se enlazan solos. Con **Crear en iCloud** subes Uni, Trabajo o Personal para tenerlos en el iPhone.
 
 Cómo funciona:

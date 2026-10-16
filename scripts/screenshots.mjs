@@ -51,6 +51,18 @@ await shot("icloud", {
     await p.locator(".f-section", { hasText: "Calendarios de iCloud" }).scrollIntoViewIfNeeded();
   },
 });
+await shot("icloud-asistente", {
+  path: "/",
+  act: async (p) => {
+    await p.evaluate(() => localStorage.clear());
+    await p.reload();
+    await p.waitForSelector(".app");
+    await p.getByRole("button", { name: "Ajustes" }).click();
+    await p.getByLabel("Apple ID").fill("nacho@icloud.com");
+    await p.getByLabel("Contraseña específica para apps").fill("abcd-efgh-ijkl-mnop");
+    await p.locator(".wizard").scrollIntoViewIfNeeded();
+  },
+});
 await shot("bienvenida", { path: "/?demo&welcome" });
 await shot("acerca-de", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.locator(".f-section", { hasText: "Acerca de" }).scrollIntoViewIfNeeded(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });

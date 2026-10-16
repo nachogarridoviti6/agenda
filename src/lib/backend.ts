@@ -53,6 +53,8 @@ export interface Backend {
   onOpenIcs(cb: () => void): Promise<() => void>;
   appInfo(): Promise<{ version: string; dataDir: string }>;
   openDataDir(): Promise<void>;
+  /** Abre una página de Apple en el navegador. */
+  openApplePage(url: string): Promise<void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -117,6 +119,7 @@ class TauriBackend implements Backend {
   }
   appInfo() { return this.call<{ version: string; dataDir: string }>("app_info"); }
   openDataDir() { return this.call<void>("open_data_dir"); }
+  openApplePage(url: string) { return this.call<void>("open_apple_page", { url }); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -312,6 +315,9 @@ export class MockBackend implements Backend {
   async onOpenIcs() { return () => {}; }
   async appInfo() { return { version: __APP_VERSION__, dataDir: "(navegador: localStorage)" }; }
   async openDataDir() {}
+  async openApplePage(url: string) {
+    window.open(url, "_blank", "noopener");
+  }
   private saveQuiet(db: MockDb) {
     this.memory = db;
     if (!this.memoryOnly) {
