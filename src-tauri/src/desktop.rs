@@ -12,6 +12,7 @@
 //!    (mensaje "TaskbarCreated"), se vuelve a anclar.
 //! 4. Red de seguridad: un hook de "ventana en primer plano". Si el escritorio pasa a primer
 //!    plano (Win+D o clic en el escritorio), el widget se recoloca justo encima de él.
+//! 5. Acepta los avisos de fin de sesión de Windows (WM_QUERYENDSESSION) y sale.
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 use windows::core::{w, BOOL, PCWSTR};
@@ -105,6 +106,10 @@ unsafe extern "system" fn subclass_proc(
             ss.styleNew = force_styles(ss.styleNew as isize) as u32;
         }
         WM_MOUSEACTIVATE => return LRESULT(MA_NOACTIVATE as isize),
+        // Windows (apagado, cierre de sesión o un instalador vía Restart Manager) pide cerrar:
+        // aceptar y salir, en vez de seguir viva en la bandeja.
+        WM_QUERYENDSESSION => return LRESULT(1),
+        WM_ENDSESSION if wparam.0 != 0 => std::process::exit(0),
         WM_SYSCOMMAND if (wparam.0 & 0xFFF0) as u32 == SC_MINIMIZE || (wparam.0 & 0xFFF0) as u32 == SC_MAXIMIZE => {
             return LRESULT(0);
         }
