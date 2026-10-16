@@ -12,6 +12,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { YearView } from "./components/YearView";
 import { QuickAdd } from "./components/QuickAdd";
 import { ScopeDialog } from "./components/ScopeDialog";
+import { Welcome } from "./components/Welcome";
+import { PendingIcsImport } from "./components/ImportExport";
 import { startOfDayZ, weekDays } from "./lib/dates";
 
 export function App() {
@@ -50,6 +52,8 @@ export function App() {
       {settings && <SettingsModal onClose={() => setSettings(false)} />}
       {quickAdd && <QuickAdd />}
       <ScopeDialog />
+      <PendingIcsImport />
+      <Welcome />
 
       {error && (
         <div className="toast" role="alert" onClick={() => useStore.setState({ error: null })}>

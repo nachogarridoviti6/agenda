@@ -12,17 +12,25 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 | 2 | Widget anclado al escritorio, bandeja del sistema, arranque con Windows | ✅ |
 | 3 | Repeticiones, alertas, añadir rápido en lenguaje natural, vistas Día y Año, búsqueda | ✅ |
 | 4 | Importar/exportar `.ics` y sincronización con iCloud (CalDAV) | ✅ |
-| 5 | Instalador `.exe` pulido | ⏳ (ya se genera uno básico en cada build) |
+| 5 | Instalador `.exe` pulido | ✅ |
 
 ## Instalar (lo normal)
 
-1. En GitHub, abre la pestaña **Actions** del repositorio.
-2. Entra en la ejecución más reciente con ✅ verde.
-3. Abajo, en **Artifacts**, descarga **Agenda-instalador-windows** (es un `.zip`).
-4. Descomprime y ejecuta `Agenda_x.y.z_x64-setup.exe`.
-   Windows SmartScreen avisará porque el instalador no está firmado: pulsa **Más información → Ejecutar de todas formas**.
+1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
+2. En **Assets**, descarga `Agenda_1.0.0_x64-setup.exe` y ábrelo.
+3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
+4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
-Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db`.
+Al terminar:
+
+- Agenda arranca con Windows y deja el widget en el escritorio. Se puede quitar en ⚙️ Ajustes.
+- Los archivos `.ics` se abren con Agenda con doble clic, y te pregunta dónde importarlos.
+- **Actualizar**: instala la versión nueva encima; tus datos se conservan.
+- **Desinstalar**: Configuración de Windows → Aplicaciones → Agenda. Quita también el arranque con Windows y te pregunta si borrar tus datos. Si usabas iCloud, pulsa antes **Desconectar iCloud** para borrar la contraseña del Administrador de credenciales.
+
+Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db` (⚙️ Ajustes → Acerca de → Abrir carpeta).
+
+> Cada cambio en GitHub también genera un instalador de prueba en **Actions** → la ejecución → **Artifacts**.
 
 ## Uso
 
@@ -180,3 +188,10 @@ Lo que hace `src-tauri/src/desktop.rs`:
    - Si Explorer se reinicia (mensaje `TaskbarCreated`), vuelve a anclarse.
 4. Como red de seguridad, un hook de «ventana en primer plano»: cuando el escritorio pasa a primer plano, recoloca el widget justo encima de él.
 5. Pide esquinas redondeadas a DWM (estilo Windows 11). El fondo acrílico es el efecto nativo de Tauri.
+
+## Publicar una versión nueva
+
+1. Sube el número de versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`.
+2. `git tag v1.0.1 && git push origin v1.0.1`
+
+GitHub Actions compila el instalador y crea la Release con el `.exe` adjunto.

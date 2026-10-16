@@ -47,6 +47,12 @@ export interface Backend {
   icloudMakeCalendar(name: string, color: string): Promise<string>;
   syncState(): Promise<SyncState>;
   syncCommit(commit: SyncCommit): Promise<void>;
+
+  /** .ics abierto con doble clic en el Explorador (null si no hay). */
+  takePendingIcs(): Promise<string | null>;
+  onOpenIcs(cb: () => void): Promise<() => void>;
+  appInfo(): Promise<{ version: string; dataDir: string }>;
+  openDataDir(): Promise<void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -104,6 +110,13 @@ class TauriBackend implements Backend {
   icloudMakeCalendar(name: string, color: string) { return this.call<string>("icloud_make_calendar", { name, color }); }
   syncState() { return this.call<SyncState>("sync_state"); }
   syncCommit(commit: SyncCommit) { return this.call<void>("sync_commit", { commit }); }
+  takePendingIcs() { return this.call<string | null>("take_pending_ics"); }
+  async onOpenIcs(cb: () => void) {
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    return getCurrentWebviewWindow().listen("open-ics", () => cb());
+  }
+  appInfo() { return this.call<{ version: string; dataDir: string }>("app_info"); }
+  openDataDir() { return this.call<void>("open_data_dir"); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -295,6 +308,10 @@ export class MockBackend implements Backend {
     if (touches) this.save(db, "calendars");
     else this.saveQuiet(db);
   }
+  async takePendingIcs() { return null; }
+  async onOpenIcs() { return () => {}; }
+  async appInfo() { return { version: __APP_VERSION__, dataDir: "(navegador: localStorage)" }; }
+  async openDataDir() {}
   private saveQuiet(db: MockDb) {
     this.memory = db;
     if (!this.memoryOnly) {

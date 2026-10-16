@@ -27,6 +27,9 @@ interface State {
   scopePrompt: { action: "save" | "delete"; resolve(scope: Scope | null): void } | null;
   quickAddOpen: boolean;
   searchFocus: number;
+  /** Contenido de un .ics pendiente de importar (doble clic en el Explorador). */
+  pendingIcs: string | null;
+  welcome: boolean;
 
   init(): Promise<void>;
   reload(kind?: string): Promise<void>;
@@ -86,12 +89,16 @@ export const useStore = create<State>((set, get) => ({
   scopePrompt: null,
   quickAddOpen: false,
   searchFocus: 0,
+  pendingIcs: null,
+  welcome: false,
 
   async init() {
     try {
       const settings = await backend.getSettings();
       const view = settings.lastView as ViewMode | undefined;
       set({
+        // (en pruebas automáticas no se enseña, salvo con ?welcome)
+        welcome: (!settings.welcomed && !navigator.webdriver) || new URLSearchParams(location.search).has("welcome"),
         theme: (settings.theme as ThemePref) ?? "system",
         view: view && ["day", "week", "month", "year"].includes(view) ? view : "week",
       });
@@ -104,6 +111,13 @@ export const useStore = create<State>((set, get) => ({
         get().setCursor(day);
       });
       await backend.onQuickAdd(() => get().openQuickAdd(true));
+      // .ics abierto con doble clic: al arrancar o con la app ya abierta.
+      const takeIcs = async () => {
+        const text = await backend.takePendingIcs();
+        if (text) set({ pendingIcs: text, editor: null });
+      };
+      await takeIcs();
+      await backend.onOpenIcs(() => void takeIcs());
     } catch (e) {
       fail(set, e);
     }

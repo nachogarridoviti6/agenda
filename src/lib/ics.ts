@@ -226,7 +226,7 @@ export function exportIcs(opts: ExportOptions): string {
     exceptionStarts.set(e.seriesId, set);
   }
 
-  const L: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Agenda//Agenda 0.3//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const L: string[] = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Agenda//Agenda 1.0//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
   if (opts.name) L.push(`X-WR-CALNAME:${escapeText(opts.name)}`);
   L.push(`X-WR-TIMEZONE:${TZ}`, ...VTIMEZONE_MADRID);
 

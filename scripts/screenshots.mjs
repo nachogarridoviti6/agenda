@@ -51,6 +51,8 @@ await shot("icloud", {
     await p.locator(".f-section", { hasText: "Calendarios de iCloud" }).scrollIntoViewIfNeeded();
   },
 });
+await shot("bienvenida", { path: "/?demo&welcome" });
+await shot("acerca-de", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.locator(".f-section", { hasText: "Acerca de" }).scrollIntoViewIfNeeded(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
 
 // Widget sobre un "fondo de escritorio" simulado para ver la transparencia.

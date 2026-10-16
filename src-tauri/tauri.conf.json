@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Agenda",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.nachogarrido.agenda",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -44,8 +44,30 @@
         "languages": [
           "Spanish"
         ],
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "windows/header.bmp",
+        "sidebarImage": "windows/sidebar.bmp",
+        "installerHooks": "windows/hooks.nsh",
+        "startMenuFolder": "Agenda",
+        "compression": "lzma"
       }
-    }
+    },
+    "publisher": "Nacho Garrido",
+    "copyright": "© 2026 Nacho Garrido",
+    "category": "Productivity",
+    "shortDescription": "Calendario estilo Apple con widget de escritorio",
+    "longDescription": "Agenda es un calendario de escritorio inspirado en Apple Calendar: vistas de día, semana, mes y año, tareas, repeticiones, alertas, añadir rápido en lenguaje natural, sincronización con iCloud y un widget fijado en el fondo del escritorio con tu semana.",
+    "fileAssociations": [
+      {
+        "ext": [
+          "ics"
+        ],
+        "name": "Calendario iCalendar",
+        "description": "Calendario (.ics)",
+        "role": "Viewer",
+        "mimeType": "text/calendar"
+      }
+    ]
   }
 }

@@ -122,7 +122,7 @@ export function ICloudSection() {
         </div>
         {formError && <p className="f-error">{formError}</p>}
         <p className="f-help">
-          Crea una <b>contraseña específica para apps</b> en <b>account.apple.com → Inicio de sesión y seguridad → Contraseñas específicas para apps</b>
+          Crea una <b>contraseña específica para apps</b> en <b>account.apple.com → Inicio de sesión y seguridad → Contraseñas específicas para apps</b>{" "}
           (necesitas la verificación en dos pasos). Se guarda cifrada en el Administrador de credenciales de Windows.
           Se sincronizan los eventos; las tareas se quedan solo en este PC.
         </p>

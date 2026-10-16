@@ -22,6 +22,59 @@ pub struct AppState {
     db: Mutex<Db>,
 }
 
+/// .ics abierto con doble clic que la ventana principal todavía no ha recogido.
+#[derive(Default)]
+struct PendingIcs(Mutex<Option<String>>);
+
+/// Si entre los argumentos hay un .ics (doble clic en el Explorador), lo lee.
+fn ics_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter()
+        .skip(1)
+        .map(std::path::PathBuf::from)
+        .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("ics")) && p.is_file())
+        .and_then(|p| std::fs::read(p).ok())
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+}
+
+fn deliver_ics(app: &AppHandle, content: String) {
+    if let Some(p) = app.try_state::<PendingIcs>() {
+        *p.0.lock().unwrap() = Some(content);
+    }
+    show_main(app, None);
+    let _ = app.emit_to("main", "open-ics", ());
+}
+
+#[tauri::command]
+fn take_pending_ics(pending: State<PendingIcs>) -> Option<String> {
+    pending.0.lock().unwrap().take()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfo {
+    version: String,
+    data_dir: String,
+}
+
+#[tauri::command]
+fn app_info(app: AppHandle) -> CmdResult<AppInfo> {
+    Ok(AppInfo {
+        version: app.package_info().version.to_string(),
+        data_dir: app.path().app_data_dir().map_err(|e| e.to_string())?.display().to_string(),
+    })
+}
+
+/// Abre la carpeta de datos en el Explorador.
+#[tauri::command]
+fn open_data_dir(app: AppHandle) -> CmdResult<()> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    let cmd = "explorer";
+    #[cfg(not(windows))]
+    let cmd = "xdg-open";
+    std::process::Command::new(cmd).arg(dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 type CmdResult<T> = Result<T, String>;
 
 /// Avisa a todas las ventanas (app principal y widget) de que algo ha cambiado.
@@ -336,7 +389,10 @@ fn init_autostart(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         // Debe ir primero: si ya hay una Agenda abierta, la segunda solo enseña la ventana.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| match ics_from_args(args) {
+            Some(content) => deliver_ics(app, content),
+            None => show_main(app, None),
+        }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
@@ -345,6 +401,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             let db = Db::open(&dir.join("agenda.db"))?;
             app.manage(AppState { db: Mutex::new(db) });
+            app.manage(PendingIcs(Mutex::new(ics_from_args(std::env::args()))));
 
             let handle = app.handle().clone();
             init_autostart(&handle);
@@ -363,7 +420,8 @@ pub fn run() {
                     let _ = m.hide();
                 }
             });
-            if !std::env::args().any(|a| a == AUTOSTART_ARG) {
+            let opened_ics = app.state::<PendingIcs>().0.lock().unwrap().is_some();
+            if opened_ics || !std::env::args().any(|a| a == AUTOSTART_ARG) {
                 main.show()?;
                 main.set_focus()?;
             }
@@ -394,6 +452,9 @@ pub fn run() {
             icloud_make_calendar,
             sync_state,
             sync_commit,
+            take_pending_ics,
+            app_info,
+            open_data_dir,
             list_tasks,
             save_task,
             delete_task,
@@ -409,4 +470,22 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error al arrancar Agenda");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detecta_ics_en_los_argumentos() {
+        let dir = std::env::temp_dir().join(format!("agenda-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("Clases.ICS");
+        std::fs::write(&f, "BEGIN:VCALENDAR").unwrap();
+        let args = vec!["agenda.exe".to_string(), "--autostart".into(), f.display().to_string()];
+        assert_eq!(ics_from_args(args).as_deref(), Some("BEGIN:VCALENDAR"));
+        assert_eq!(ics_from_args(vec!["agenda.exe".to_string(), "C:\\no\\existe.ics".into()]), None);
+        assert_eq!(ics_from_args(vec![f.display().to_string()]), None, "el primer argumento es el programa");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

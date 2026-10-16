@@ -1347,3 +1347,56 @@ kbd {
   margin-left: auto;
   display: inline-flex;
 }
+
+/* Bienvenida */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 6px 2px;
+}
+.welcome h2 {
+  margin: 10px 0 16px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.welcome-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+}
+.welcome-tip {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.welcome-icon {
+  font-size: 22px;
+  width: 32px;
+  text-align: center;
+  flex: none;
+}
+.welcome-tip p {
+  margin: 2px 0 0;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.welcome-go {
+  margin-top: 18px;
+  width: 100%;
+  height: 36px;
+}
+.f-path {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.toast.ok {
+  background: #34c759;
+}

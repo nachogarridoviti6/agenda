@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useStore } from "../store";
 import { backend, newId } from "../lib/backend";
 import { exportIcs, importIcs, type ImportResult } from "../lib/ics";
@@ -46,7 +46,7 @@ export function ImportExportSection() {
   );
 }
 
-function ImportDialog({ result, onClose }: { result: ImportResult; onClose(msg?: string): void }) {
+export function ImportDialog({ result, onClose }: { result: ImportResult; onClose(msg?: string): void }) {
   const calendars = useStore((s) => s.calendars);
   const hasSource = result.sourceCalendar.size > 0;
   const [target, setTarget] = useState<string>(hasSource ? "source" : result.name ? "new" : (calendars[0]?.id ?? "new"));
@@ -188,5 +188,40 @@ function ExportDialog({ onClose }: { onClose(msg?: string): void }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Diálogo para un .ics abierto con doble clic en el Explorador. */
+export function PendingIcsImport() {
+  const text = useStore((s) => s.pendingIcs);
+  const result = useMemo(() => {
+    if (!text) return null;
+    try {
+      return importIcs(text);
+    } catch (e) {
+      useStore.setState({ error: String(e instanceof Error ? e.message : e), pendingIcs: null });
+      return null;
+    }
+  }, [text]);
+  const [done, setDone] = useState<string | null>(null);
+  if (done) {
+    return (
+      <div className="toast ok" role="status" onClick={() => setDone(null)}>
+        {done}
+      </div>
+    );
+  }
+  if (!result) return null;
+  return (
+    <ImportDialog
+      result={result}
+      onClose={(msg) => {
+        useStore.setState({ pendingIcs: null });
+        if (msg) {
+          setDone(msg);
+          setTimeout(() => setDone(null), 5000);
+        }
+      }}
+    />
   );
 }

@@ -39,11 +39,13 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [autostart, setAutostartState] = useState<boolean | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [info, setInfo] = useState<{ version: string; dataDir: string } | null>(null);
 
   useEffect(() => {
     void backend.getWidgetConfig().then(setWidget);
     void backend.listMonitors().then(setMonitors);
     void backend.getAutostart().then(setAutostartState).catch(() => setAutostartState(null));
+    void backend.appInfo().then(setInfo).catch(() => {});
     // Si se mueve el widget arrastrándolo, reflejar la nueva posición/tamaño.
     const off = backend.onChange((k) => k === "settings" && void backend.getWidgetConfig().then(setWidget));
     return () => void off.then((f) => f());
@@ -167,6 +169,18 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
 
         <div className="f-section">Importar y exportar</div>
         <ImportExportSection />
+
+        <div className="f-section">Acerca de</div>
+        <div className="f-group">
+          <Row label="Versión">
+            <span className="f-muted">Agenda {info?.version ?? ""}</span>
+          </Row>
+          <Row label="Datos">
+            <span className="f-muted f-path" title={info?.dataDir}>{info?.dataDir}</span>
+            <button className="btn small" onClick={() => void backend.openDataDir()}>Abrir carpeta</button>
+          </Row>
+        </div>
+        <p className="f-help">Para hacer una copia de seguridad, usa «Exportar .ics» o copia la carpeta de datos.</p>
 
         <div className="f-actions">
           <span className="spacer" />
