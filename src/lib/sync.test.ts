@@ -197,6 +197,33 @@ describe("sincronización con iCloud", () => {
     expect(titles()).toEqual(["Cena"]);
   });
 
+  it("los eventos antiguos (fuera de la ventana de un año) no se borran ni se descargan", async () => {
+    server.remotePut(`${CAL}OLD.ics`, iphoneEvent("OLD", "Viejo", "2024-01-10"));
+    server.remotePut(`${CAL}NEW.ics`, iphoneEvent("NEW", "Nuevo", "2026-10-20"));
+    await sync();
+    expect(titles()).toEqual(["Nuevo"]); // el de 2024 no se baja
+    // Un evento local antiguo ya sincronizado no se borra cuando sale de la ventana
+    local.events.set("l-old", ev("l-old", "Local viejo", clock, { start: combine("2026-10-01", "10:00"), end: combine("2026-10-01", "11:00") }));
+    await sync();
+    clock = combine("2027-11-01", "12:00");
+    const r = await sync();
+    expect(r.deletedLocal).toBe(0);
+    expect(titles()).toContain("Local viejo");
+  });
+
+  it("mover entre calendarios no borra el evento aunque se sincronicen a la vez", async () => {
+    const CAL2 = server.addCalendar("https://fake.icloud/123/calendars/work/", "Trabajo");
+    await local.commit({ upsertLinks: [{ calendarId: "cal-trabajo", url: CAL2, ctag: null }] });
+    for (let i = 0; i < 5; i++) local.events.set(`m${i}`, ev(`m${i}`, `Visita ${i}`, clock));
+    await sync();
+    for (let i = 0; i < 5; i++) local.edit(`m${i}`, { calendarId: "cal-trabajo" }, tick());
+    await sync();
+    await sync();
+    expect(titles()).toHaveLength(5);
+    expect(server.cals.get(CAL2)!.items.size).toBe(5);
+    expect(server.cals.get(CAL)!.items.size).toBe(0);
+  });
+
   it("los errores de un evento no paran el resto", async () => {
     local.events.set("l1", ev("l1", "Uno", clock));
     local.events.set("l2", ev("l2", "Dos", clock));

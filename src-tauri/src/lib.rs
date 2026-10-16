@@ -45,8 +45,8 @@ fn deliver_ics(app: &AppHandle, content: String) {
 }
 
 #[tauri::command]
-fn take_pending_ics(pending: State<PendingIcs>) -> Option<String> {
-    pending.0.lock().unwrap().take()
+async fn take_pending_ics(pending: State<'_, PendingIcs>) -> CmdResult<Option<String>> {
+    Ok(pending.0.lock().map_err(|e| e.to_string())?.take())
 }
 
 #[derive(serde::Serialize)]
@@ -57,7 +57,7 @@ struct AppInfo {
 }
 
 #[tauri::command]
-fn app_info(app: AppHandle) -> CmdResult<AppInfo> {
+async fn app_info(app: AppHandle) -> CmdResult<AppInfo> {
     Ok(AppInfo {
         version: app.package_info().version.to_string(),
         data_dir: app.path().app_data_dir().map_err(|e| e.to_string())?.display().to_string(),
@@ -66,7 +66,7 @@ fn app_info(app: AppHandle) -> CmdResult<AppInfo> {
 
 /// Abre una página de ayuda de Apple en el navegador (solo se permiten direcciones de Apple).
 #[tauri::command]
-fn open_apple_page(url: String) -> CmdResult<()> {
+async fn open_apple_page(url: String) -> CmdResult<()> {
     let allowed = ["https://account.apple.com/", "https://support.apple.com/"];
     if !allowed.iter().any(|a| url.starts_with(a)) || url.contains(['"', ' ', '&', '|', '^']) {
         return Err("Dirección no permitida".into());
@@ -80,7 +80,7 @@ fn open_apple_page(url: String) -> CmdResult<()> {
 
 /// Abre la carpeta de datos en el Explorador.
 #[tauri::command]
-fn open_data_dir(app: AppHandle) -> CmdResult<()> {
+async fn open_data_dir(app: AppHandle) -> CmdResult<()> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     #[cfg(windows)]
     let cmd = "explorer";
@@ -96,73 +96,73 @@ fn changed(app: &AppHandle, kind: &str) {
     let _ = app.emit("data-changed", kind);
 }
 
-fn with_db<T>(state: &State<AppState>, f: impl FnOnce(&Db) -> CmdResult<T>) -> CmdResult<T> {
+fn with_db<T>(state: &State<'_, AppState>, f: impl FnOnce(&Db) -> CmdResult<T>) -> CmdResult<T> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     f(&db)
 }
 
 #[tauri::command]
-fn list_calendars(state: State<AppState>) -> CmdResult<Vec<Calendar>> {
+async fn list_calendars(state: State<'_, AppState>) -> CmdResult<Vec<Calendar>> {
     with_db(&state, |db| db.list_calendars())
 }
 
 #[tauri::command]
-fn save_calendar(app: AppHandle, state: State<AppState>, calendar: Calendar) -> CmdResult<()> {
+async fn save_calendar(app: AppHandle, state: State<'_, AppState>, calendar: Calendar) -> CmdResult<()> {
     with_db(&state, |db| db.save_calendar(&calendar))?;
     changed(&app, "calendars");
     Ok(())
 }
 
 #[tauri::command]
-fn delete_calendar(app: AppHandle, state: State<AppState>, id: String) -> CmdResult<()> {
+async fn delete_calendar(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
     with_db(&state, |db| db.delete_calendar(&id))?;
     changed(&app, "calendars");
     Ok(())
 }
 
 #[tauri::command]
-fn list_events(state: State<AppState>, from: i64, to: i64) -> CmdResult<Vec<CalEvent>> {
+async fn list_events(state: State<'_, AppState>, from: i64, to: i64) -> CmdResult<Vec<CalEvent>> {
     with_db(&state, |db| db.list_events(from, to))
 }
 
 #[tauri::command]
-fn get_event(state: State<AppState>, id: String) -> CmdResult<Option<CalEvent>> {
+async fn get_event(state: State<'_, AppState>, id: String) -> CmdResult<Option<CalEvent>> {
     with_db(&state, |db| db.get_event(&id))
 }
 
 #[tauri::command]
-fn save_event(app: AppHandle, state: State<AppState>, event: CalEvent) -> CmdResult<()> {
+async fn save_event(app: AppHandle, state: State<'_, AppState>, event: CalEvent) -> CmdResult<()> {
     with_db(&state, |db| db.save_event(&event))?;
     changed(&app, "events");
     Ok(())
 }
 
 #[tauri::command]
-fn delete_event(app: AppHandle, state: State<AppState>, id: String) -> CmdResult<()> {
+async fn delete_event(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
     with_db(&state, |db| db.delete_event(&id))?;
     changed(&app, "events");
     Ok(())
 }
 
 #[tauri::command]
-fn list_all_events(state: State<AppState>) -> CmdResult<Vec<CalEvent>> {
+async fn list_all_events(state: State<'_, AppState>) -> CmdResult<Vec<CalEvent>> {
     with_db(&state, |db| db.all_events())
 }
 
 #[tauri::command]
-fn delete_exceptions_from(app: AppHandle, state: State<AppState>, series_id: String, from: i64) -> CmdResult<()> {
+async fn delete_exceptions_from(app: AppHandle, state: State<'_, AppState>, series_id: String, from: i64) -> CmdResult<()> {
     with_db(&state, |db| db.delete_exceptions_from(&series_id, from))?;
     changed(&app, "events");
     Ok(())
 }
 
 #[tauri::command]
-fn set_alarms(app: AppHandle, alarms: Vec<alarms::Alarm>) {
+async fn set_alarms(app: AppHandle, alarms: Vec<alarms::Alarm>) {
     alarms::set(&app, alarms);
 }
 
 #[tauri::command]
-fn save_bulk(app: AppHandle, state: State<AppState>, calendars: Vec<Calendar>, events: Vec<CalEvent>, tasks: Vec<Task>) -> CmdResult<()> {
+async fn save_bulk(app: AppHandle, state: State<'_, AppState>, calendars: Vec<Calendar>, events: Vec<CalEvent>, tasks: Vec<Task>) -> CmdResult<()> {
     with_db(&state, |db| db.save_bulk(&calendars, &events, &tasks))?;
     changed(&app, "calendars");
     Ok(())
@@ -203,16 +203,33 @@ async fn save_ics(app: AppHandle, content: String, file_name: String) -> CmdResu
 
 const ICLOUD_KEY: &str = "icloud";
 
-fn icloud_account_of(state: &State<AppState>) -> CmdResult<Option<caldav::Account>> {
+fn icloud_account_of(state: &State<'_, AppState>) -> CmdResult<Option<caldav::Account>> {
     with_db(state, |db| {
         Ok(db.get_settings()?.get(ICLOUD_KEY).cloned().and_then(|v| serde_json::from_value(v).ok()))
     })
 }
 
-fn icloud_session(state: &State<AppState>) -> CmdResult<(caldav::Account, caldav::Session)> {
+/// Sesión HTTP con iCloud reutilizada entre peticiones (mantiene la conexión abierta y no lee
+/// la contraseña del Administrador de credenciales cada vez).
+static SESSION: Mutex<Option<(String, std::sync::Arc<caldav::Session>)>> = Mutex::new(None);
+
+fn forget_session() {
+    if let Ok(mut s) = SESSION.lock() {
+        *s = None;
+    }
+}
+
+fn icloud_session(state: &State<'_, AppState>) -> CmdResult<(caldav::Account, std::sync::Arc<caldav::Session>)> {
     let account = icloud_account_of(state)?.ok_or("iCloud no está conectado.")?;
+    let mut cache = SESSION.lock().map_err(|e| e.to_string())?;
+    if let Some((id, session)) = cache.as_ref() {
+        if *id == account.apple_id {
+            return Ok((account, session.clone()));
+        }
+    }
     let password = caldav::load_password(&account.apple_id)?;
-    let session = caldav::Session::new(&account.apple_id, &password)?;
+    let session = std::sync::Arc::new(caldav::Session::new(&account.apple_id, &password)?);
+    *cache = Some((account.apple_id.clone(), session.clone()));
     Ok((account, session))
 }
 
@@ -224,6 +241,7 @@ async fn icloud_connect(app: AppHandle, apple_id: String, password: String) -> C
     let session = caldav::Session::new(&apple_id, &password)?;
     let home_url = session.discover(caldav::ICLOUD_URL).await?;
     caldav::store_password(&apple_id, &password)?;
+    forget_session();
     let account = caldav::Account { apple_id, home_url };
     let state = app.state::<AppState>();
     with_db(&state, |db| db.set_setting(ICLOUD_KEY, &serde_json::to_value(&account).map_err(|e| e.to_string())?))?;
@@ -232,16 +250,17 @@ async fn icloud_connect(app: AppHandle, apple_id: String, password: String) -> C
 }
 
 #[tauri::command]
-fn icloud_account(state: State<AppState>) -> CmdResult<Option<caldav::Account>> {
+async fn icloud_account(state: State<'_, AppState>) -> CmdResult<Option<caldav::Account>> {
     icloud_account_of(&state)
 }
 
 /// Desconecta: borra la contraseña de Windows y los enlaces. Los eventos se quedan en el PC.
 #[tauri::command]
-fn icloud_disconnect(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
+async fn icloud_disconnect(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
     if let Some(account) = icloud_account_of(&state)? {
         caldav::delete_password(&account.apple_id);
     }
+    forget_session();
     with_db(&state, |db| {
         db.sync_reset()?;
         db.set_setting(ICLOUD_KEY, &serde_json::Value::Null)
@@ -257,9 +276,9 @@ async fn icloud_calendars(app: AppHandle) -> CmdResult<Vec<caldav::RemoteCalenda
 }
 
 #[tauri::command]
-async fn icloud_list_etags(app: AppHandle, url: String) -> CmdResult<Vec<caldav::ETagItem>> {
+async fn icloud_list_etags(app: AppHandle, url: String, since: Option<i64>) -> CmdResult<Vec<caldav::ETagItem>> {
     let (_, session) = icloud_session(&app.state::<AppState>())?;
-    session.list_etags(&url).await
+    session.list_etags(&url, since).await
 }
 
 #[tauri::command]
@@ -287,12 +306,12 @@ async fn icloud_make_calendar(app: AppHandle, name: String, color: String) -> Cm
 }
 
 #[tauri::command]
-fn sync_state(state: State<AppState>) -> CmdResult<SyncState> {
+async fn sync_state(state: State<'_, AppState>) -> CmdResult<SyncState> {
     with_db(&state, |db| db.sync_state())
 }
 
 #[tauri::command]
-fn sync_commit(app: AppHandle, state: State<AppState>, commit: SyncCommit) -> CmdResult<()> {
+async fn sync_commit(app: AppHandle, state: State<'_, AppState>, commit: SyncCommit) -> CmdResult<()> {
     let touches_data = !commit.save_events.is_empty() || !commit.delete_event_ids.is_empty() || !commit.save_calendars.is_empty();
     with_db(&state, |db| db.sync_commit(&commit))?;
     if touches_data {
@@ -302,31 +321,31 @@ fn sync_commit(app: AppHandle, state: State<AppState>, commit: SyncCommit) -> Cm
 }
 
 #[tauri::command]
-fn list_tasks(state: State<AppState>) -> CmdResult<Vec<Task>> {
+async fn list_tasks(state: State<'_, AppState>) -> CmdResult<Vec<Task>> {
     with_db(&state, |db| db.list_tasks())
 }
 
 #[tauri::command]
-fn save_task(app: AppHandle, state: State<AppState>, task: Task) -> CmdResult<()> {
+async fn save_task(app: AppHandle, state: State<'_, AppState>, task: Task) -> CmdResult<()> {
     with_db(&state, |db| db.save_task(&task))?;
     changed(&app, "tasks");
     Ok(())
 }
 
 #[tauri::command]
-fn delete_task(app: AppHandle, state: State<AppState>, id: String) -> CmdResult<()> {
+async fn delete_task(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
     with_db(&state, |db| db.delete_task(&id))?;
     changed(&app, "tasks");
     Ok(())
 }
 
 #[tauri::command]
-fn get_settings(state: State<AppState>) -> CmdResult<HashMap<String, serde_json::Value>> {
+async fn get_settings(state: State<'_, AppState>) -> CmdResult<HashMap<String, serde_json::Value>> {
     with_db(&state, |db| db.get_settings())
 }
 
 #[tauri::command]
-fn set_setting(app: AppHandle, state: State<AppState>, key: String, value: serde_json::Value) -> CmdResult<()> {
+async fn set_setting(app: AppHandle, state: State<'_, AppState>, key: String, value: serde_json::Value) -> CmdResult<()> {
     with_db(&state, |db| db.set_setting(&key, &value))?;
     changed(&app, "settings");
     Ok(())
@@ -335,12 +354,12 @@ fn set_setting(app: AppHandle, state: State<AppState>, key: String, value: serde
 // ---------- Widget, ventana principal y sistema ----------
 
 #[tauri::command]
-fn widget_get_config(app: AppHandle) -> WidgetConfig {
+async fn widget_get_config(app: AppHandle) -> WidgetConfig {
     widget::load_config(&app)
 }
 
 #[tauri::command]
-fn widget_set_config(app: AppHandle, config: WidgetConfig) -> CmdResult<()> {
+async fn widget_set_config(app: AppHandle, config: WidgetConfig) -> CmdResult<()> {
     widget::save_config(&app, &config)?;
     widget::apply(&app)?;
     tray::sync_widget_item(&app);
@@ -348,28 +367,28 @@ fn widget_set_config(app: AppHandle, config: WidgetConfig) -> CmdResult<()> {
 }
 
 #[tauri::command]
-fn widget_snap(app: AppHandle, corner: String) -> CmdResult<()> {
+async fn widget_snap(app: AppHandle, corner: String) -> CmdResult<()> {
     widget::snap_to(&app, &corner)
 }
 
 #[tauri::command]
-fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
+async fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
     widget::list_monitors(&app)
 }
 
 /// Abre (o trae al frente) la ventana principal; si se indica un día, navega a él.
 #[tauri::command]
-fn open_main(app: AppHandle, day: Option<i64>) {
+async fn open_main(app: AppHandle, day: Option<i64>) {
     show_main(&app, day);
 }
 
 #[tauri::command]
-fn get_autostart(app: AppHandle) -> CmdResult<bool> {
+async fn get_autostart(app: AppHandle) -> CmdResult<bool> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn set_autostart(app: AppHandle, enabled: bool) -> CmdResult<()> {
+async fn set_autostart(app: AppHandle, enabled: bool) -> CmdResult<()> {
     let al = app.autolaunch();
     if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
 }
@@ -493,8 +512,9 @@ mod tests {
 
     #[test]
     fn solo_abre_paginas_de_apple() {
-        assert!(open_apple_page("https://evil.example/".into()).is_err());
-        assert!(open_apple_page("https://account.apple.com/x\" & calc".into()).is_err());
+        let run = |u: &str| tauri::async_runtime::block_on(open_apple_page(u.into()));
+        assert!(run("https://evil.example/").is_err());
+        assert!(run("https://account.apple.com/x\" & calc").is_err());
     }
 
     #[test]

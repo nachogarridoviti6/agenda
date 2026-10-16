@@ -40,7 +40,7 @@ export interface Backend {
   icloudAccount(): Promise<ICloudAccount | null>;
   icloudDisconnect(): Promise<void>;
   icloudCalendars(): Promise<RemoteCalendar[]>;
-  icloudListEtags(url: string): Promise<ETagItem[]>;
+  icloudListEtags(url: string, since?: number): Promise<ETagItem[]>;
   icloudFetch(url: string, hrefs: string[]): Promise<Resource[]>;
   icloudPut(href: string, data: string, etag: string | null): Promise<string | null>;
   icloudDelete(href: string, etag: string | null): Promise<void>;
@@ -105,7 +105,7 @@ class TauriBackend implements Backend {
   icloudAccount() { return this.call<ICloudAccount | null>("icloud_account"); }
   icloudDisconnect() { return this.call<void>("icloud_disconnect"); }
   icloudCalendars() { return this.call<RemoteCalendar[]>("icloud_calendars"); }
-  icloudListEtags(url: string) { return this.call<ETagItem[]>("icloud_list_etags", { url }); }
+  icloudListEtags(url: string, since?: number) { return this.call<ETagItem[]>("icloud_list_etags", { url, since: since ?? null }); }
   icloudFetch(url: string, hrefs: string[]) { return this.call<Resource[]>("icloud_fetch", { url, hrefs }); }
   icloudPut(href: string, data: string, etag: string | null) { return this.call<string | null>("icloud_put", { href, data, etag }); }
   icloudDelete(href: string, etag: string | null) { return this.call<void>("icloud_delete", { href, etag }); }
@@ -289,7 +289,7 @@ export class MockBackend implements Backend {
     this.save(db, "settings");
   }
   icloudCalendars() { return this.fake.calendars(); }
-  icloudListEtags(url: string) { return this.fake.listEtags(url); }
+  icloudListEtags(url: string, since?: number) { return this.fake.listEtags(url, since); }
   icloudFetch(url: string, hrefs: string[]) { return this.fake.fetch(url, hrefs); }
   icloudPut(href: string, data: string, etag: string | null) { return this.fake.put(href, data, etag); }
   icloudDelete(href: string, etag: string | null) { return this.fake.del(href, etag); }

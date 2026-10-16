@@ -13,6 +13,10 @@
  */
 import type { CalEvent, Calendar, Id } from "./types";
 import { exportIcs, importIcs, preservedFrom } from "./ics";
+import { expandRule, parseRRule } from "./rrule";
+
+/** Solo se sincroniza desde hace un año: evita descargar años de historial cada vez. */
+export const SYNC_WINDOW_MS = 365 * 86_400_000;
 
 export interface RemoteCalendar {
   url: string;
@@ -59,7 +63,8 @@ export interface SyncCommit {
 
 export interface Transport {
   calendars(): Promise<RemoteCalendar[]>;
-  listEtags(url: string): Promise<ETagItem[]>;
+  /** Con `since` (UTC ms), solo los eventos con alguna aparición desde esa fecha. */
+  listEtags(url: string, since?: number): Promise<ETagItem[]>;
   fetch(url: string, hrefs: string[]): Promise<Resource[]>;
   put(href: string, data: string, etag: string | null): Promise<string | null>;
   del(href: string, etag: string | null): Promise<void>;
@@ -132,13 +137,15 @@ export async function syncAll(t: Transport, store: LocalStore, now = Date.now())
     for (const i of orphanItems) itemsById.delete(i.eventId);
   }
 
-  for (const link of linkByCal.values()) {
-    try {
-      await syncCalendar(t, store, link, remoteCals.find((r) => r.url === link.url)!, { all, byId, exceptionsOf, itemsById, linkByCal, calendars }, report, now);
-    } catch (e) {
-      report.errors.push(`${calName(link.calendarId)}: ${String(e)}`);
-    }
-  }
+  // Todos los calendarios a la vez.
+  const ctx = { all, byId, exceptionsOf, itemsById, linkByCal, calendars, since: now - SYNC_WINDOW_MS };
+  await Promise.all(
+    [...linkByCal.values()].map((link) =>
+      syncCalendar(t, store, link, remoteCals.find((r) => r.url === link.url)!, ctx, report, now).catch((e) => {
+        report.errors.push(`${calName(link.calendarId)}: ${String(e)}`);
+      }),
+    ),
+  );
   return report;
 }
 
@@ -149,6 +156,16 @@ interface Ctx {
   itemsById: Map<Id, SyncItem>;
   linkByCal: Map<Id, SyncLink>;
   calendars: Calendar[];
+  since: number;
+}
+
+/** ¿Tiene el evento (o su serie) alguna aparición desde `since`? Si no, iCloud no lo lista por la ventana de fechas. */
+function inWindow(e: CalEvent, since: number): boolean {
+  if (e.end >= since) return true;
+  const rule = parseRRule(e.rrule);
+  if (!rule) return false;
+  if (rule.until == null && rule.count == null) return true;
+  return expandRule(rule, { ...e, exdates: [] }, since, Number.MAX_SAFE_INTEGER).length > 0;
 }
 
 async function syncCalendar(t: Transport, store: LocalStore, link: SyncLink, remote: RemoteCalendar, ctx: Ctx, report: SyncReport, now: number) {
@@ -169,7 +186,7 @@ async function syncCalendar(t: Transport, store: LocalStore, link: SyncLink, rem
   if (!hasLocalWork && link.ctag != null && link.ctag === remote.ctag) return; // nada nuevo en ningún lado
 
   const commit: Required<SyncCommit> = { saveCalendars: [], upsertLinks: [], deleteLinkCalendarIds: [], saveEvents: [], deleteEventIds: [], upsertItems: [], deleteItemIds: [] };
-  const etags = new Map((await t.listEtags(link.url)).map((x) => [x.href, x.etag]));
+  const etags = new Map((await t.listEtags(link.url, ctx.since)).map((x) => [x.href, x.etag]));
   const byHref = new Map(items.map((i) => [i.href, i]));
   const toFetch: string[] = [];
   const pushAfter = new Map<Id, string>(); // id → ETag remota con la que hacer If-Match
@@ -178,6 +195,10 @@ async function syncCalendar(t: Transport, store: LocalStore, link: SyncLink, rem
   for (const it of items) {
     const ev = ctx.byId.get(it.eventId);
     const remoteEtag = etags.get(it.href);
+    // Lo movieron aquí a otro calendario: lo gestiona la sincronización de ese calendario.
+    if (ev && ev.calendarId !== link.calendarId) continue;
+    // Fuera de la ventana de fechas: iCloud no lo lista, pero no está borrado.
+    if (remoteEtag == null && ev && !inWindow(ev, ctx.since)) continue;
     if (remoteEtag == null) {
       // Borrado en iCloud. Si aquí se cambió desde entonces, se vuelve a crear; si no, se borra aquí.
       if (ev && ev.calendarId === link.calendarId && localChanged(ev)) {
@@ -303,7 +324,7 @@ async function syncCalendar(t: Transport, store: LocalStore, link: SyncLink, rem
 
   // iCloud no siempre devuelve la ETag tras un PUT: se pregunta una vez.
   if (missingEtags.length) {
-    const fresh = new Map((await t.listEtags(link.url)).map((x) => [x.href, x.etag]));
+    const fresh = new Map((await t.listEtags(link.url, ctx.since)).map((x) => [x.href, x.etag]));
     for (const it of missingEtags) it.etag = fresh.get(it.href) ?? "";
   }
 

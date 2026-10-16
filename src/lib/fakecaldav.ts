@@ -36,9 +36,12 @@ export class FakeCalDav implements Transport {
   async calendars(): Promise<RemoteCalendar[]> {
     return [...this.cals].map(([url, c]) => ({ url, name: c.name, color: c.color, ctag: String(c.ctag), supportsEvents: true }));
   }
-  async listEtags(url: string) {
+  /** Con `since` imita el filtro de fechas del servidor: excluye eventos sueltos que terminaron antes. */
+  async listEtags(url: string, since?: number) {
     this.log.push(`LIST ${url}`);
-    return [...this.cal(url).items].map(([href, v]) => ({ href, etag: v.etag }));
+    return [...this.cal(url).items]
+      .filter(([, v]) => since == null || /RRULE:/.test(v.data) || endOf(v.data) >= since)
+      .map(([href, v]) => ({ href, etag: v.etag }));
   }
   async fetch(url: string, hrefs: string[]): Promise<Resource[]> {
     this.log.push(`GET ${hrefs.length}`);
@@ -72,4 +75,11 @@ export class FakeCalDav implements Transport {
     this.addCalendar(url, name, color);
     return url;
   }
+}
+
+/** Fin (UTC ms) del primer VEVENT, de forma aproximada (para el filtro de fechas del simulador). */
+function endOf(data: string): number {
+  const m = data.match(/DTEND[^:\r\n]*:(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 23), +(m[5] ?? 59));
 }

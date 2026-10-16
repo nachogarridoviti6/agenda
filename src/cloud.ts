@@ -19,7 +19,7 @@ interface CloudState {
 
 export const transport: Transport = {
   calendars: () => backend.icloudCalendars().then((cs) => cs.map((c) => ({ ...c, color: c.color ?? null, ctag: c.ctag ?? null }))),
-  listEtags: (url) => backend.icloudListEtags(url),
+  listEtags: (url, since) => backend.icloudListEtags(url, since),
   fetch: (url, hrefs) => backend.icloudFetch(url, hrefs),
   put: (href, data, etag) => backend.icloudPut(href, data, etag),
   del: (href, etag) => backend.icloudDelete(href, etag),
@@ -66,12 +66,17 @@ export const useCloud = create<CloudState>((set, get) => ({
     set({ syncing: true });
     running = (async () => {
       try {
-        const report = await syncAll(transport, localStore);
+        const report = await Promise.race([
+          syncAll(transport, localStore),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("iCloud está tardando demasiado. Se volverá a intentar en unos minutos.")), 120_000),
+          ),
+        ]);
         ignoreChangesUntil = Date.now() + 2000;
         set({ lastSync: Date.now(), lastReport: report, error: report.errors[0] ?? null });
         return report;
       } catch (e) {
-        set({ error: String(e) });
+        set({ error: e instanceof Error ? e.message : String(e) });
         return null;
       } finally {
         set({ syncing: false });

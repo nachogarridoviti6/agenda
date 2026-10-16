@@ -1,18 +1,18 @@
 //! Anclaje del widget al escritorio de Windows.
 //!
 //! Técnica (ver README, "Widget"):
-//! 1. La ventana pasa a ser "propiedad" (owner, GWLP_HWNDPARENT) de la ventana del escritorio
-//!    (la que contiene SHELLDLL_DefView: WorkerW o Progman). Windows siempre dibuja una ventana
-//!    con propietario por encima de él, así que al pulsar Win+D —que trae el escritorio al
-//!    frente— el widget sigue visible. A diferencia de meterla *dentro* de WorkerW (el truco de
-//!    los fondos animados), sigue siendo una ventana normal y recibe clics.
-//! 2. Estilos WS_EX_TOOLWINDOW (fuera de la barra de tareas y de Alt+Tab) y WS_EX_NOACTIVATE.
-//! 3. Subclase de la ventana: cualquier intento de cambiar su orden Z se convierte en
-//!    HWND_BOTTOM, los clics no la activan, no se puede minimizar y, si Explorer se reinicia
-//!    (mensaje "TaskbarCreated"), se vuelve a anclar.
-//! 4. Red de seguridad: un hook de "ventana en primer plano". Si el escritorio pasa a primer
-//!    plano (Win+D o clic en el escritorio), el widget se recoloca justo encima de él.
-//! 5. Acepta los avisos de fin de sesión de Windows (WM_QUERYENDSESSION) y sale.
+//! 1. Estilos WS_EX_TOOLWINDOW (fuera de la barra de tareas y de Alt+Tab) y WS_EX_NOACTIVATE.
+//! 2. Subclase de la ventana: mientras el escritorio no está al frente, cualquier cambio de
+//!    orden Z se convierte en HWND_BOTTOM; los clics no la activan y no se puede minimizar.
+//! 3. Hook de "ventana en primer plano": si el escritorio pasa al frente (Win+D, clic en el
+//!    escritorio), el widget se coloca justo encima de la ventana del escritorio; en cuanto
+//!    otra app pasa al frente, vuelve al fondo.
+//! 4. Acepta los avisos de fin de sesión de Windows (WM_QUERYENDSESSION) y sale.
+//!
+//! Nota: la versión 1.0.x hacía además al widget "propiedad" (owner) de la ventana del
+//! escritorio del Explorador. Esa relación entre procesos, junto con forzar HWND_BOTTOM
+//! (Windows exige que una ventana con propietario quede por encima de él), podía bloquear el
+//! hilo principal de Agenda. Ya no se usa.
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 use windows::core::{w, BOOL, PCWSTR};
@@ -24,6 +24,8 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 static WIDGET: AtomicIsize = AtomicIsize::new(0);
 static REPOSITIONING: AtomicBool = AtomicBool::new(false);
+/// true mientras el escritorio está en primer plano (el widget va encima de él).
+static DESKTOP_MODE: AtomicBool = AtomicBool::new(false);
 static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
 const SUBCLASS_ID: usize = 0xA6E0DA;
@@ -63,12 +65,6 @@ fn force_styles(ex: isize) -> isize {
     (ex | WS_EX_TOOLWINDOW.0 as isize | WS_EX_NOACTIVATE.0 as isize) & !(WS_EX_APPWINDOW.0 as isize)
 }
 
-unsafe fn set_owner_to_desktop(hwnd: HWND) {
-    if let Some(desk) = desktop_window() {
-        SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, desk.0 as isize);
-    }
-}
-
 /// Coloca el widget justo encima de la ventana del escritorio (o al fondo si no se encuentra).
 unsafe fn place_above_desktop(widget: HWND) {
     let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
@@ -94,7 +90,7 @@ unsafe extern "system" fn subclass_proc(
     match msg {
         WM_WINDOWPOSCHANGING => {
             let wp = &mut *(lparam.0 as *mut WINDOWPOS);
-            if !REPOSITIONING.load(Ordering::SeqCst) && (wp.flags & SWP_NOZORDER).0 == 0 {
+            if !REPOSITIONING.load(Ordering::SeqCst) && !DESKTOP_MODE.load(Ordering::SeqCst) && (wp.flags & SWP_NOZORDER).0 == 0 {
                 wp.hwndInsertAfter = HWND_BOTTOM;
             }
             // Nunca activar la ventana al moverla.
@@ -115,8 +111,7 @@ unsafe extern "system" fn subclass_proc(
         }
         m if m != 0 && m == TASKBAR_CREATED.load(Ordering::SeqCst) => {
             // Explorer se ha reiniciado: hay una ventana de escritorio nueva.
-            set_owner_to_desktop(hwnd);
-            place_above_desktop(hwnd);
+            send_to_bottom(hwnd);
         }
         _ => {}
     }
@@ -142,8 +137,18 @@ unsafe extern "system" fn on_foreground(
     }
     let class = class_name(hwnd);
     if class == "WorkerW" || class == "Progman" || Some(hwnd) == desktop_window() {
+        DESKTOP_MODE.store(true, Ordering::SeqCst);
         place_above_desktop(widget);
+    } else if DESKTOP_MODE.swap(false, Ordering::SeqCst) {
+        // Otra app al frente: el widget vuelve al fondo.
+        send_to_bottom(widget);
     }
+}
+
+unsafe fn send_to_bottom(widget: HWND) {
+    REPOSITIONING.store(true, Ordering::SeqCst);
+    let _ = SetWindowPos(widget, Some(HWND_BOTTOM), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    REPOSITIONING.store(false, Ordering::SeqCst);
 }
 
 /// Ancla la ventana al escritorio. Debe llamarse desde el hilo principal (el del bucle de mensajes).
@@ -156,7 +161,6 @@ pub fn pin(raw_hwnd: isize) {
         }
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, force_styles(ex));
-        set_owner_to_desktop(hwnd);
 
         let pref = DWMWCP_ROUND;
         let _ = DwmSetWindowAttribute(
@@ -179,11 +183,13 @@ pub fn pin(raw_hwnd: isize) {
                 WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
             );
         }
-        place_above_desktop(hwnd);
+        send_to_bottom(hwnd);
     }
 }
 
 /// Recoloca el widget al fondo (tras moverlo o redimensionarlo).
 pub fn send_to_back(raw_hwnd: isize) {
-    unsafe { place_above_desktop(hwnd_from(raw_hwnd)) }
+    if !DESKTOP_MODE.load(Ordering::SeqCst) {
+        unsafe { send_to_bottom(hwnd_from(raw_hwnd)) }
+    }
 }

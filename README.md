@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.2_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.3_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -101,6 +101,7 @@ El código se guarda cifrado en el **Administrador de credenciales de Windows** 
 
 Cómo funciona:
 
+- Se sincronizan los eventos desde hace un año en adelante (lo anterior se queda como esté).
 - Se sincroniza al abrir la app, cada 10 minutos, al volver a la ventana y unos segundos después de cambiar algo. Apple no avisa de los cambios por CalDAV, así que lo que apuntes en el iPhone puede tardar hasta 10 minutos en aparecer (o pulsa la nube abajo a la izquierda).
 - Viajan los eventos con sus repeticiones, cambios puntuales y alertas. Al subir un cambio se conserva lo que Agenda no gestiona (invitados, enlaces, ajustes de Apple).
 - Si un evento cambia en los dos sitios a la vez, gana el cambio más reciente y Agenda te lo dice en Ajustes.
@@ -180,18 +181,17 @@ Se pedía que el widget quedara detrás de las demás ventanas, sin salir en la 
 |---|---|
 | Meter la ventana **dentro** de `WorkerW`, el truco de los fondos animados | Queda detrás de los iconos del escritorio y no recibe clics. El checkbox y el doble clic no funcionarían sin hooks globales de ratón. Además, Windows 11 24H2 cambió esa jerarquía de ventanas. |
 | Solo `SetWindowPos(HWND_BOTTOM)` | Win+D trae el escritorio al frente y el widget desaparece debajo. |
-| **Ventana propiedad del escritorio** (la elegida) | — |
+| **Ventana al fondo + hook de «escritorio al frente»** (la elegida) | — |
 
 Lo que hace `src-tauri/src/desktop.rs`:
 
-1. Asigna como **propietaria** (`GWLP_HWNDPARENT`) la ventana que contiene los iconos del escritorio: `WorkerW` o `Progman`. Windows siempre dibuja una ventana con propietario por encima de él. Por eso, cuando Win+D trae el escritorio al frente, el widget sigue encima. Al seguir siendo una ventana normal, recibe clics.
+1. Es una ventana normal (recibe clics) que se mantiene al fondo. Cuando el escritorio pasa al frente (Win+D), un hook de Windows la coloca justo encima de él, y cuando vuelves a otra app regresa al fondo. La versión 1.0.x la hacía además «propiedad» de la ventana del escritorio del Explorador, pero esa relación entre procesos podía bloquear la app y se quitó en la 1.0.3.
 2. Añade los estilos `WS_EX_TOOLWINDOW` (fuera de la barra de tareas y de Alt+Tab) y `WS_EX_NOACTIVATE` (hacer clic no le roba el foco a la ventana en la que trabajas).
 3. Aplica una subclase a la ventana:
    - Todo cambio de orden Z se convierte en `HWND_BOTTOM`.
    - No se puede minimizar ni maximizar.
    - Mantiene sus estilos aunque Tauri los recalcule.
    - Si Explorer se reinicia (mensaje `TaskbarCreated`), vuelve a anclarse.
-4. Como red de seguridad, un hook de «ventana en primer plano»: cuando el escritorio pasa a primer plano, recoloca el widget justo encima de él.
 5. Pide esquinas redondeadas a DWM (estilo Windows 11). El fondo acrílico es el efecto nativo de Tauri.
 
 ## Publicar una versión nueva

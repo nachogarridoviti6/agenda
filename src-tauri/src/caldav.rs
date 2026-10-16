@@ -177,12 +177,20 @@ impl Session {
         parse_calendars(&xml, &url)
     }
 
-    pub async fn list_etags(&self, cal_url: &str) -> CalResult<Vec<ETagItem>> {
-        let body = r#"<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+    /// ETags de los eventos; con `since` (UTC ms) solo los que tienen alguna aparición desde esa fecha
+    /// (el servidor expande las repeticiones), para no bajar años de historial.
+    pub async fn list_etags(&self, cal_url: &str, since: Option<i64>) -> CalResult<Vec<ETagItem>> {
+        let range = since
+            .and_then(chrono_utc)
+            .map(|start| format!(r#"<c:time-range start="{start}"/>"#))
+            .unwrap_or_default();
+        let body = format!(
+            r#"<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:prop><d:getetag/></d:prop>
-  <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT"/></c:comp-filter></c:filter>
-</c:calendar-query>"#;
-        let (url, status, _, xml) = self.request("REPORT", cal_url, Some("1"), Some(body.to_string()), &[]).await?;
+  <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">{range}</c:comp-filter></c:comp-filter></c:filter>
+</c:calendar-query>"#
+        );
+        let (url, status, _, xml) = self.request("REPORT", cal_url, Some("1"), Some(body), &[]).await?;
         if status.as_u16() != 207 {
             return Err(friendly(status));
         }
@@ -255,6 +263,28 @@ impl Session {
             Err(friendly(status))
         }
     }
+}
+
+/// UTC ms → "20251016T000000Z" (formato de CalDAV), sin dependencias extra.
+fn chrono_utc(ms: i64) -> Option<String> {
+    if ms < 0 {
+        return None;
+    }
+    let secs = ms / 1000;
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+    // Algoritmo civil_from_days (Howard Hinnant)
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    Some(format!("{y:04}{m:02}{d:02}T{:02}{:02}{:02}Z", rem / 3600, (rem % 3600) / 60, rem % 60))
 }
 
 // ---------- XML ----------
@@ -375,6 +405,13 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+
+    #[test]
+    fn fechas_caldav_en_utc() {
+        assert_eq!(chrono_utc(0).as_deref(), Some("19700101T000000Z"));
+        assert_eq!(chrono_utc(1_792_108_800_000).as_deref(), Some("20261016T000000Z"));
+        assert_eq!(chrono_utc(951_782_400_000 + 3_723_000).as_deref(), Some("20000229T010203Z"));
+    }
 
     #[test]
     fn join_resuelve_hrefs() {
