@@ -21,6 +21,12 @@ export interface Backend {
   deleteExceptionsFrom(seriesId: Id, from: number): Promise<void>;
   /** Alertas que el backend debe disparar como notificaciones de Windows. */
   setAlarms(alarms: Alarm[]): Promise<void>;
+  /** Importación: guarda todo de golpe (una transacción, un solo aviso de cambios). */
+  saveBulk(calendars: Calendar[], events: CalEvent[], tasks: Task[]): Promise<void>;
+  /** Elige un .ics y devuelve su contenido (null si se cancela). */
+  pickIcs(): Promise<string | null>;
+  /** Guarda un .ics donde diga el usuario. Devuelve la ruta (null si se cancela). */
+  saveIcs(content: string, fileName: string): Promise<string | null>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -64,6 +70,9 @@ class TauriBackend implements Backend {
   listAllEvents() { return this.call<CalEvent[]>("list_all_events"); }
   deleteExceptionsFrom(seriesId: Id, from: number) { return this.call<void>("delete_exceptions_from", { seriesId, from }); }
   setAlarms(alarms: Alarm[]) { return this.call<void>("set_alarms", { alarms }); }
+  saveBulk(calendars: Calendar[], events: CalEvent[], tasks: Task[]) { return this.call<void>("save_bulk", { calendars, events, tasks }); }
+  pickIcs() { return this.call<string | null>("pick_ics"); }
+  saveIcs(content: string, fileName: string) { return this.call<string | null>("save_ics", { content, fileName }); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -169,6 +178,35 @@ export class MockBackend implements Backend {
     this.save(db, "events");
   }
   async setAlarms() {}
+  async saveBulk(calendars: Calendar[], events: CalEvent[], tasks: Task[]) {
+    const db = this.load();
+    for (const c of calendars) db.calendars = this.upsert(db.calendars, c);
+    for (const e of events) db.events = this.upsert(db.events, e);
+    for (const t of tasks) db.tasks = this.upsert(db.tasks, t);
+    this.save(db, "calendars");
+  }
+  pickIcs(): Promise<string | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".ics,text/calendar";
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (!f) return resolve(null);
+        void f.text().then(resolve);
+      };
+      input.click();
+    });
+  }
+  async saveIcs(content: string, fileName: string) {
+    const url = URL.createObjectURL(new Blob([content], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return fileName;
+  }
   async saveEvent(e: CalEvent) { const db = this.load(); db.events = this.upsert(db.events, e); this.save(db, "events"); }
   async deleteEvent(id: Id) {
     const db = this.load();

@@ -832,7 +832,8 @@ kbd {
 }
 .f-label {
   flex: none;
-  width: 140px;
+  min-width: 120px;
+  white-space: nowrap;
   color: var(--text);
 }
 .f-control {
@@ -1296,4 +1297,25 @@ kbd {
   .segmented button {
     padding: 4px 9px;
   }
+}
+
+.btn.small {
+  height: 26px;
+  padding: 0 12px;
+  background: var(--bg-elev);
+  font-size: 12.5px;
+}
+.text-input {
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-elev);
+  padding: 4px 8px;
+  min-width: 180px;
+}
+.import-summary {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.modal .form {
+  max-height: calc(100vh - 80px);
 }

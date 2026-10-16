@@ -243,6 +243,32 @@ impl Db {
         Ok(())
     }
 
+    /// Guarda muchos calendarios, eventos y tareas de golpe (importación) en una transacción.
+    pub fn save_bulk(&self, calendars: &[Calendar], events: &[CalEvent], tasks: &[Task]) -> DbResult<()> {
+        self.conn.execute_batch("BEGIN").map_err(err)?;
+        let result = (|| {
+            for c in calendars {
+                self.save_calendar(c)?;
+            }
+            // Primero las series y después sus excepciones (clave foránea series_id).
+            let (singles, exceptions): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.series_id.is_none());
+            for e in singles.into_iter().chain(exceptions) {
+                self.save_event(e)?;
+            }
+            for t in tasks {
+                self.save_task(t)?;
+            }
+            Ok(())
+        })();
+        match result {
+            Ok(()) => self.conn.execute_batch("COMMIT").map_err(err),
+            Err(e) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                Err(e)
+            }
+        }
+    }
+
     // ---------- Tareas ----------
 
     pub fn list_tasks(&self) -> DbResult<Vec<Task>> {
@@ -407,6 +433,19 @@ mod tests {
         db.delete_exceptions_from("serie", 150).unwrap();
         let ids: Vec<_> = db.all_events().unwrap().into_iter().map(|e| e.id).collect();
         assert_eq!(ids, ["serie", "ex1"]);
+    }
+
+    #[test]
+    fn guardado_en_bloque_es_todo_o_nada() {
+        let db = Db::open_in_memory().unwrap();
+        let mut ex = ev("ex", 10, 20, None);
+        ex.series_id = Some("serie".into());
+        // La excepción va antes en la lista, pero se guarda después de su serie.
+        db.save_bulk(&[], &[ex, ev("serie", 0, 50, Some("FREQ=DAILY"))], &[]).unwrap();
+        assert_eq!(db.all_events().unwrap().len(), 2);
+        // Un evento inválido deshace todo el bloque.
+        assert!(db.save_bulk(&[], &[ev("ok", 0, 10, None), ev("mal", 10, 0, None)], &[]).is_err());
+        assert_eq!(db.all_events().unwrap().len(), 2);
     }
 
     #[test]

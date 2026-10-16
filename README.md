@@ -11,7 +11,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 | 1 | App principal: vistas Semana y Mes, eventos, tareas, calendarios con color, persistencia, modo claro/oscuro | ✅ |
 | 2 | Widget anclado al escritorio, bandeja del sistema, arranque con Windows | ✅ |
 | 3 | Repeticiones, alertas, añadir rápido en lenguaje natural, vistas Día y Año, búsqueda | ✅ |
-| 4 | Importar/exportar `.ics` (y CalDAV con iCloud, opcional) | ⏳ |
+| 4 | Importar/exportar `.ics` | ✅ (CalDAV con iCloud: pendiente de decidir) |
 | 5 | Instalador `.exe` pulido | ⏳ (ya se genera uno básico en cada build) |
 
 ## Instalar (lo normal)
@@ -78,6 +78,14 @@ Escribe una frase y verás una vista previa antes de crearla:
 - Al editar, mover o borrar una repetición, Agenda pregunta: **Solo este evento** o **Todos los futuros**.
 - Hasta **dos alertas** por evento: notificación nativa de Windows, aunque la ventana esté cerrada. Las de los eventos de todo el día suenan a las 9:00. Las tareas con hora avisan a su hora límite.
 
+### Importar y exportar (.ics)
+
+**⚙️ Ajustes → Importar y exportar.**
+
+- **Exportar**: eliges calendarios y si incluyes las tareas, y te guarda un `.ics` compatible con Apple Calendar, Google Calendar y Outlook. Incluye repeticiones, cambios puntuales y alertas. También sirve como **copia de seguridad**: cada evento recuerda su calendario.
+- **Importar**: acepta `.ics` de Apple, Google y Outlook (zonas horarias incluidas). Puedes meterlo todo en un calendario nuevo, en uno existente o, si es una copia de Agenda, en sus calendarios originales. Reimportar el mismo archivo actualiza los eventos en vez de duplicarlos.
+- **Para pasar eventos al iPhone**: exporta, envíate el archivo por correo o AirDrop y ábrelo en el iPhone. Para traer el calendario del iPhone: en iCloud.com → Calendario → compartir el calendario como público, descarga el enlace `webcal://` como `.ics` e impórtalo.
+
 Campos de hora: puedes escribir `9`, `930`, `9:30` o `21h`, y usar las flechas `↑`/`↓` para sumar o restar 15 minutos.
 
 ## Desarrollo
@@ -122,6 +130,7 @@ src/                  Frontend (React + TS)
   lib/nlp.ts          Añadir rápido en lenguaje natural
   lib/alarms.ts       Cálculo de alertas (las dispara src-tauri/src/alarms.rs)
   lib/search.ts       Búsqueda
+  lib/ics.ts          Importar y exportar iCalendar (.ics)
   lib/backend.ts      Contrato con el backend: Tauri o simulado
   components/         Vistas, barra lateral, editores
   lib/widget.ts       Qué enseña el widget (semana y tareas)

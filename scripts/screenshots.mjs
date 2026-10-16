@@ -35,6 +35,7 @@ await shot("anadir-rapido-tarea-oscuro", { scheme: "dark", act: async (p) => { a
 await shot("busqueda", { act: async (p) => { await p.keyboard.press("Control+f"); await p.keyboard.type("calculo"); } });
 await shot("repeticion", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); } });
 await shot("solo-este-o-futuros", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); await p.getByPlaceholder("Título").fill("Cálculo II (examen)"); await p.getByRole("dialog").getByRole("button", { name: "Guardar" }).click(); } });
+await shot("exportar", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.getByRole("button", { name: "Exportar .ics…" }).click(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
 
 // Widget sobre un "fondo de escritorio" simulado para ver la transparencia.

@@ -94,6 +94,44 @@ fn set_alarms(app: AppHandle, alarms: Vec<alarms::Alarm>) {
 }
 
 #[tauri::command]
+fn save_bulk(app: AppHandle, state: State<AppState>, calendars: Vec<Calendar>, events: Vec<CalEvent>, tasks: Vec<Task>) -> CmdResult<()> {
+    with_db(&state, |db| db.save_bulk(&calendars, &events, &tasks))?;
+    changed(&app, "calendars");
+    Ok(())
+}
+
+/// Abre el selector de archivos de Windows y devuelve el contenido del .ics elegido.
+#[tauri::command]
+async fn pick_ics(app: AppHandle) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let file = app
+        .dialog()
+        .file()
+        .set_title("Importar calendario")
+        .add_filter("Calendario (.ics)", &["ics", "ical", "ifb", "icalendar"])
+        .blocking_pick_file();
+    let Some(path) = file.and_then(|f| f.into_path().ok()) else { return Ok(None) };
+    let bytes = std::fs::read(&path).map_err(|e| format!("No se pudo leer el archivo: {e}"))?;
+    Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
+}
+
+/// Pregunta dónde guardar y escribe el .ics. Devuelve la ruta o None si se cancela.
+#[tauri::command]
+async fn save_ics(app: AppHandle, content: String, file_name: String) -> CmdResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let file = app
+        .dialog()
+        .file()
+        .set_title("Exportar calendario")
+        .set_file_name(&file_name)
+        .add_filter("Calendario (.ics)", &["ics"])
+        .blocking_save_file();
+    let Some(path) = file.and_then(|f| f.into_path().ok()) else { return Ok(None) };
+    std::fs::write(&path, content).map_err(|e| format!("No se pudo guardar el archivo: {e}"))?;
+    Ok(Some(path.display().to_string()))
+}
+
+#[tauri::command]
 fn list_tasks(state: State<AppState>) -> CmdResult<Vec<Task>> {
     with_db(&state, |db| db.list_tasks())
 }
@@ -197,6 +235,7 @@ pub fn run() {
         // Debe ir primero: si ya hay una Agenda abierta, la segunda solo enseña la ventana.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
@@ -238,6 +277,9 @@ pub fn run() {
             list_all_events,
             delete_exceptions_from,
             set_alarms,
+            save_bulk,
+            pick_ics,
+            save_ics,
             list_tasks,
             save_task,
             delete_task,
