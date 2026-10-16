@@ -110,3 +110,42 @@ describe("importar archivos de otras apps", () => {
     expect(() => importIcs("hola")).toThrow(/no es un calendario/);
   });
 });
+
+import { preservedFrom } from "./ics";
+
+describe("para sincronizar", () => {
+  const iphone = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Apple Inc.//iOS 18//EN",
+    "BEGIN:VEVENT", "UID:7F3A-IPHONE", "DTSTAMP:20261015T100000Z", "LAST-MODIFIED:20261015T100000Z", "SEQUENCE:2",
+    "DTSTART;TZID=Europe/Madrid:20261020T100000", "DTEND;TZID=Europe/Madrid:20261020T110000", "SUMMARY:Dentista",
+    "URL;VALUE=URI:https://clinica.example", "X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+
+  it("guarda el UID original y la fecha de modificación", () => {
+    const r = importIcs(iphone, now);
+    const id = r.events[0].id;
+    expect(r.uids.get(id)).toBe("7F3A-IPHONE");
+    expect(new Date(r.modified.get(id)!).toISOString()).toBe("2026-10-15T10:00:00.000Z");
+    expect(r.lossy.size).toBe(0);
+  });
+
+  it("al reescribir conserva el UID, lo que Agenda no gestiona y sube SEQUENCE", () => {
+    const r = importIcs(iphone, now);
+    const e = { ...r.events[0], title: "Dentista (revisión)", calendarId: "cal-personal" };
+    const { preserve, sequence } = preservedFrom(iphone);
+    const out = exportIcs({ events: [e], calendars: DEFAULT_CALENDARS, uids: r.uids, preserve, sequence, now });
+    expect(out).toContain("UID:7F3A-IPHONE");
+    expect(out).toContain("SUMMARY:Dentista (revisión)");
+    expect(out).toContain("URL;VALUE=URI:https://clinica.example");
+    expect(out).toContain("X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC");
+    expect(out).toContain("SEQUENCE:3");
+    expect(out.match(/SUMMARY:/g)).toHaveLength(1);
+  });
+
+  it("invitaciones y reglas raras se marcan como no editables", () => {
+    const withAttendee = iphone.replace("SUMMARY:Dentista", "SUMMARY:Reunión\r\nATTENDEE;CN=Ana:mailto:ana@example.com");
+    const r = importIcs(withAttendee, now);
+    expect(r.lossy.has(r.events[0].id)).toBe(true);
+  });
+});

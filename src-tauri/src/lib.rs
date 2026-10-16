@@ -1,4 +1,5 @@
 mod alarms;
+mod caldav;
 mod db;
 #[cfg(windows)]
 mod desktop;
@@ -7,7 +8,7 @@ mod tray;
 mod widget;
 
 use db::Db;
-use models::{CalEvent, Calendar, Task};
+use models::{CalEvent, Calendar, SyncCommit, SyncState, Task};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
@@ -129,6 +130,108 @@ async fn save_ics(app: AppHandle, content: String, file_name: String) -> CmdResu
     let Some(path) = file.and_then(|f| f.into_path().ok()) else { return Ok(None) };
     std::fs::write(&path, content).map_err(|e| format!("No se pudo guardar el archivo: {e}"))?;
     Ok(Some(path.display().to_string()))
+}
+
+// ---------- iCloud (CalDAV) ----------
+
+const ICLOUD_KEY: &str = "icloud";
+
+fn icloud_account_of(state: &State<AppState>) -> CmdResult<Option<caldav::Account>> {
+    with_db(state, |db| {
+        Ok(db.get_settings()?.get(ICLOUD_KEY).cloned().and_then(|v| serde_json::from_value(v).ok()))
+    })
+}
+
+fn icloud_session(state: &State<AppState>) -> CmdResult<(caldav::Account, caldav::Session)> {
+    let account = icloud_account_of(state)?.ok_or("iCloud no está conectado.")?;
+    let password = caldav::load_password(&account.apple_id)?;
+    let session = caldav::Session::new(&account.apple_id, &password)?;
+    Ok((account, session))
+}
+
+/// Comprueba las credenciales, descubre la cuenta y guarda la contraseña en Windows.
+#[tauri::command]
+async fn icloud_connect(app: AppHandle, apple_id: String, password: String) -> CmdResult<caldav::Account> {
+    let apple_id = apple_id.trim().to_string();
+    let password = password.trim().replace(' ', "");
+    let session = caldav::Session::new(&apple_id, &password)?;
+    let home_url = session.discover(caldav::ICLOUD_URL).await?;
+    caldav::store_password(&apple_id, &password)?;
+    let account = caldav::Account { apple_id, home_url };
+    let state = app.state::<AppState>();
+    with_db(&state, |db| db.set_setting(ICLOUD_KEY, &serde_json::to_value(&account).map_err(|e| e.to_string())?))?;
+    changed(&app, "settings");
+    Ok(account)
+}
+
+#[tauri::command]
+fn icloud_account(state: State<AppState>) -> CmdResult<Option<caldav::Account>> {
+    icloud_account_of(&state)
+}
+
+/// Desconecta: borra la contraseña de Windows y los enlaces. Los eventos se quedan en el PC.
+#[tauri::command]
+fn icloud_disconnect(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
+    if let Some(account) = icloud_account_of(&state)? {
+        caldav::delete_password(&account.apple_id);
+    }
+    with_db(&state, |db| {
+        db.sync_reset()?;
+        db.set_setting(ICLOUD_KEY, &serde_json::Value::Null)
+    })?;
+    changed(&app, "settings");
+    Ok(())
+}
+
+#[tauri::command]
+async fn icloud_calendars(app: AppHandle) -> CmdResult<Vec<caldav::RemoteCalendar>> {
+    let (account, session) = icloud_session(&app.state::<AppState>())?;
+    session.list_calendars(&account.home_url).await
+}
+
+#[tauri::command]
+async fn icloud_list_etags(app: AppHandle, url: String) -> CmdResult<Vec<caldav::ETagItem>> {
+    let (_, session) = icloud_session(&app.state::<AppState>())?;
+    session.list_etags(&url).await
+}
+
+#[tauri::command]
+async fn icloud_fetch(app: AppHandle, url: String, hrefs: Vec<String>) -> CmdResult<Vec<caldav::Resource>> {
+    let (_, session) = icloud_session(&app.state::<AppState>())?;
+    session.fetch(&url, &hrefs).await
+}
+
+#[tauri::command]
+async fn icloud_put(app: AppHandle, href: String, data: String, etag: Option<String>) -> CmdResult<Option<String>> {
+    let (_, session) = icloud_session(&app.state::<AppState>())?;
+    session.put(&href, &data, etag.as_deref()).await
+}
+
+#[tauri::command]
+async fn icloud_delete(app: AppHandle, href: String, etag: Option<String>) -> CmdResult<()> {
+    let (_, session) = icloud_session(&app.state::<AppState>())?;
+    session.delete(&href, etag.as_deref()).await
+}
+
+#[tauri::command]
+async fn icloud_make_calendar(app: AppHandle, name: String, color: String) -> CmdResult<String> {
+    let (account, session) = icloud_session(&app.state::<AppState>())?;
+    session.make_calendar(&account.home_url, &name, &color).await
+}
+
+#[tauri::command]
+fn sync_state(state: State<AppState>) -> CmdResult<SyncState> {
+    with_db(&state, |db| db.sync_state())
+}
+
+#[tauri::command]
+fn sync_commit(app: AppHandle, state: State<AppState>, commit: SyncCommit) -> CmdResult<()> {
+    let touches_data = !commit.save_events.is_empty() || !commit.delete_event_ids.is_empty() || !commit.save_calendars.is_empty();
+    with_db(&state, |db| db.sync_commit(&commit))?;
+    if touches_data {
+        changed(&app, "calendars");
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -280,6 +383,17 @@ pub fn run() {
             save_bulk,
             pick_ics,
             save_ics,
+            icloud_connect,
+            icloud_account,
+            icloud_disconnect,
+            icloud_calendars,
+            icloud_list_etags,
+            icloud_fetch,
+            icloud_put,
+            icloud_delete,
+            icloud_make_calendar,
+            sync_state,
+            sync_commit,
             list_tasks,
             save_task,
             delete_task,

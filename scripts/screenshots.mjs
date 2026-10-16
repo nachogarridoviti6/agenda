@@ -36,6 +36,21 @@ await shot("busqueda", { act: async (p) => { await p.keyboard.press("Control+f")
 await shot("repeticion", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); } });
 await shot("solo-este-o-futuros", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); await p.getByPlaceholder("Título").fill("Cálculo II (examen)"); await p.getByRole("dialog").getByRole("button", { name: "Guardar" }).click(); } });
 await shot("exportar", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.getByRole("button", { name: "Exportar .ics…" }).click(); } });
+await shot("icloud", {
+  path: "/",
+  act: async (p) => {
+    await p.evaluate(() => localStorage.clear());
+    await p.reload();
+    await p.waitForSelector(".app");
+    await p.getByRole("button", { name: "Ajustes" }).click();
+    await p.getByLabel("Apple ID").fill("nacho@icloud.com");
+    await p.getByLabel("Contraseña específica para apps").fill("abcd-efgh-ijkl-mnop");
+    await p.getByRole("button", { name: "Conectar con iCloud" }).click();
+    await p.getByLabel("Sincronizar Casa con").selectOption("new");
+    await p.waitForTimeout(500);
+    await p.locator(".f-section", { hasText: "Calendarios de iCloud" }).scrollIntoViewIfNeeded();
+  },
+});
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
 
 // Widget sobre un "fondo de escritorio" simulado para ver la transparencia.

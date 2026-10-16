@@ -2,6 +2,13 @@ import type { CalEvent, Calendar, Corner, Id, MonitorInfo, Task, WidgetConfig } 
 import { DEFAULT_CALENDARS, DEFAULT_WIDGET } from "./defaults";
 import { demoData } from "./demo";
 import type { Alarm } from "./alarms";
+import type { RemoteCalendar, Resource, ETagItem, SyncCommit, SyncState } from "./sync";
+import { FakeCalDav } from "./fakecaldav";
+
+export interface ICloudAccount {
+  appleId: string;
+  homeUrl: string;
+}
 
 /**
  * Contrato con el backend. En la app real lo implementa Rust (SQLite) vía comandos de Tauri;
@@ -27,6 +34,19 @@ export interface Backend {
   pickIcs(): Promise<string | null>;
   /** Guarda un .ics donde diga el usuario. Devuelve la ruta (null si se cancela). */
   saveIcs(content: string, fileName: string): Promise<string | null>;
+
+  // iCloud (CalDAV). La contraseña la guarda Rust en el Administrador de credenciales.
+  icloudConnect(appleId: string, password: string): Promise<ICloudAccount>;
+  icloudAccount(): Promise<ICloudAccount | null>;
+  icloudDisconnect(): Promise<void>;
+  icloudCalendars(): Promise<RemoteCalendar[]>;
+  icloudListEtags(url: string): Promise<ETagItem[]>;
+  icloudFetch(url: string, hrefs: string[]): Promise<Resource[]>;
+  icloudPut(href: string, data: string, etag: string | null): Promise<string | null>;
+  icloudDelete(href: string, etag: string | null): Promise<void>;
+  icloudMakeCalendar(name: string, color: string): Promise<string>;
+  syncState(): Promise<SyncState>;
+  syncCommit(commit: SyncCommit): Promise<void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -73,6 +93,17 @@ class TauriBackend implements Backend {
   saveBulk(calendars: Calendar[], events: CalEvent[], tasks: Task[]) { return this.call<void>("save_bulk", { calendars, events, tasks }); }
   pickIcs() { return this.call<string | null>("pick_ics"); }
   saveIcs(content: string, fileName: string) { return this.call<string | null>("save_ics", { content, fileName }); }
+  icloudConnect(appleId: string, password: string) { return this.call<ICloudAccount>("icloud_connect", { appleId, password }); }
+  icloudAccount() { return this.call<ICloudAccount | null>("icloud_account"); }
+  icloudDisconnect() { return this.call<void>("icloud_disconnect"); }
+  icloudCalendars() { return this.call<RemoteCalendar[]>("icloud_calendars"); }
+  icloudListEtags(url: string) { return this.call<ETagItem[]>("icloud_list_etags", { url }); }
+  icloudFetch(url: string, hrefs: string[]) { return this.call<Resource[]>("icloud_fetch", { url, hrefs }); }
+  icloudPut(href: string, data: string, etag: string | null) { return this.call<string | null>("icloud_put", { href, data, etag }); }
+  icloudDelete(href: string, etag: string | null) { return this.call<void>("icloud_delete", { href, etag }); }
+  icloudMakeCalendar(name: string, color: string) { return this.call<string>("icloud_make_calendar", { name, color }); }
+  syncState() { return this.call<SyncState>("sync_state"); }
+  syncCommit(commit: SyncCommit) { return this.call<void>("sync_commit", { commit }); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -122,9 +153,19 @@ export class MockBackend implements Backend {
       this.memory = { calendars: DEFAULT_CALENDARS, events: [], tasks: [], settings: {}, ...seed };
       this.memoryOnly = true;
     }
-    this.channel?.addEventListener("message", (e) => {
-      if (!String(e.data).startsWith("navigate:")) this.listeners.forEach((l) => l(String(e.data)));
-    });
+    // Avisos entre pestañas con el evento "storage": llega cuando los datos ya están escritos
+    // (un BroadcastChannel puede adelantarse a localStorage entre procesos).
+    if (typeof window !== "undefined" && !this.memoryOnly) {
+      window.addEventListener("storage", (e) => {
+        if (e.key !== this.key || !e.newValue) return;
+        try {
+          const kind = (JSON.parse(e.newValue) as { _kind?: string })._kind ?? "events";
+          this.listeners.forEach((l) => l(kind));
+        } catch {
+          /* ignorar */
+        }
+      });
+    }
   }
 
   private load(): MockDb {
@@ -143,13 +184,12 @@ export class MockBackend implements Backend {
     this.memory = db;
     if (!this.memoryOnly) {
       try {
-        localStorage.setItem(this.key, JSON.stringify(db));
+        localStorage.setItem(this.key, JSON.stringify({ ...db, _kind: kind, _t: Date.now() + Math.random() }));
       } catch {
         /* se queda en memoria */
       }
     }
     this.listeners.forEach((l) => l(kind));
-    if (!this.memoryOnly) this.channel?.postMessage(kind);
   }
   private upsert<T extends { id: Id }>(list: T[], item: T): T[] {
     const i = list.findIndex((x) => x.id === item.id);
@@ -197,6 +237,73 @@ export class MockBackend implements Backend {
       };
       input.click();
     });
+  }
+  // iCloud simulado en el navegador (para desarrollar y para las pruebas de interfaz).
+  private fake = MockBackend.makeFake();
+  static makeFake() {
+    const f = new FakeCalDav();
+    f.addCalendar("https://fake.icloud/123/calendars/home/", "Casa", "#FF2968");
+    f.addCalendar("https://fake.icloud/123/calendars/work/", "Trabajo", "#FF9500");
+    const day = new Date(Date.now() + 2 * 86_400_000);
+    const ymd = `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, "0")}${String(day.getDate()).padStart(2, "0")}`;
+    f.remotePut(
+      "https://fake.icloud/123/calendars/home/ABC-IPHONE.ics",
+      ["BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VEVENT", "UID:ABC-IPHONE", "DTSTAMP:20261001T080000Z",
+        `DTSTART;TZID=Europe/Madrid:${ymd}T170000`, `DTEND;TZID=Europe/Madrid:${ymd}T180000`,
+        "SUMMARY:Dentista (desde el iPhone)", "END:VEVENT", "END:VCALENDAR"].join("\r\n"),
+    );
+    return f;
+  }
+  private syncDb(): SyncState {
+    const st = this.load().settings.__sync as SyncState | undefined;
+    return st ?? { links: [], items: [] };
+  }
+  async icloudConnect(appleId: string, password: string) {
+    if (!/^[a-z]{4}-?[a-z]{4}-?[a-z]{4}-?[a-z]{4}$/i.test(password.replace(/\s/g, "")))
+      throw new Error("iCloud ha rechazado el Apple ID o la contraseña. Usa una contraseña específica para apps (no la de tu Apple ID).");
+    const account = { appleId, homeUrl: "https://fake.icloud/123/calendars/" };
+    await this.setSetting("icloud", account);
+    return account;
+  }
+  async icloudAccount() { return (this.load().settings.icloud as ICloudAccount | undefined) ?? null; }
+  async icloudDisconnect() {
+    const db = this.load();
+    delete db.settings.icloud;
+    delete db.settings.__sync;
+    this.save(db, "settings");
+  }
+  icloudCalendars() { return this.fake.calendars(); }
+  icloudListEtags(url: string) { return this.fake.listEtags(url); }
+  icloudFetch(url: string, hrefs: string[]) { return this.fake.fetch(url, hrefs); }
+  icloudPut(href: string, data: string, etag: string | null) { return this.fake.put(href, data, etag); }
+  icloudDelete(href: string, etag: string | null) { return this.fake.del(href, etag); }
+  icloudMakeCalendar(name: string, color: string) { return this.fake.makeCalendar(name, color); }
+  async syncState() { return structuredClone(this.syncDb()); }
+  async syncCommit(c: SyncCommit) {
+    const db = this.load();
+    const st = (db.settings.__sync as SyncState | undefined) ?? { links: [], items: [] };
+    for (const cal of c.saveCalendars ?? []) db.calendars = this.upsert(db.calendars, cal);
+    for (const id of c.deleteLinkCalendarIds ?? []) st.links = st.links.filter((l) => l.calendarId !== id);
+    for (const l of c.upsertLinks ?? []) st.links = [...st.links.filter((x) => x.calendarId !== l.calendarId), l];
+    for (const id of c.deleteEventIds ?? []) db.events = db.events.filter((e) => e.id !== id);
+    for (const e of c.saveEvents ?? []) db.events = this.upsert(db.events, e);
+    for (const id of c.deleteItemIds ?? []) st.items = st.items.filter((i) => i.eventId !== id);
+    for (const i of c.upsertItems ?? []) st.items = [...st.items.filter((x) => x.eventId !== i.eventId), i];
+    db.settings.__sync = st;
+    const touches = (c.saveEvents?.length ?? 0) + (c.deleteEventIds?.length ?? 0) + (c.saveCalendars?.length ?? 0) > 0;
+    this.memory = db;
+    if (touches) this.save(db, "calendars");
+    else this.saveQuiet(db);
+  }
+  private saveQuiet(db: MockDb) {
+    this.memory = db;
+    if (!this.memoryOnly) {
+      try {
+        localStorage.setItem(this.key, JSON.stringify(db));
+      } catch {
+        /* en memoria */
+      }
+    }
   }
   async saveIcs(content: string, fileName: string) {
     const url = URL.createObjectURL(new Blob([content], { type: "text/calendar" }));

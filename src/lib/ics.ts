@@ -41,6 +41,8 @@ interface Prop {
   name: string;
   params: Record<string, string>;
   value: string;
+  /** Línea original (desplegada), para conservar propiedades que Agenda no gestiona. */
+  raw: string;
 }
 
 function parseLine(line: string): Prop | null {
@@ -61,7 +63,7 @@ function parseLine(line: string): Prop | null {
     const eq = p.indexOf("=");
     if (eq > 0) params[p.slice(0, eq).toUpperCase()] = p.slice(eq + 1).replace(/^"|"$/g, "");
   }
-  return { name: (parts[0] ?? "").toUpperCase(), params, value };
+  return { name: (parts[0] ?? "").toUpperCase(), params, value, raw: line };
 }
 
 interface Component {
@@ -199,10 +201,23 @@ function alertToTrigger(lead: number, allDay: boolean): string {
   return formatDuration(-(allDay ? lead - 540 : lead));
 }
 
-export function exportIcs(opts: { events: CalEvent[]; tasks?: Task[]; calendars: Calendar[]; name?: string; now?: number }): string {
+export interface ExportOptions {
+  events: CalEvent[];
+  tasks?: Task[];
+  calendars: Calendar[];
+  name?: string;
+  now?: number;
+  /** UID a usar por id de serie/evento (para respetar los UID creados en el iPhone). */
+  uids?: Map<string, string>;
+  /** Líneas que conservar de la versión remota, por componente ("" = maestro, o el ms de RECURRENCE-ID). */
+  preserve?: Map<string, string[]>;
+  sequence?: number;
+}
+
+export function exportIcs(opts: ExportOptions): string {
   const now = opts.now ?? Date.now();
   const calName = new Map(opts.calendars.map((c) => [c.id, c.name]));
-  const uidOf = (id: string) => `${id}@agenda`;
+  const uidOf = (id: string) => opts.uids?.get(id) ?? `${id}@agenda`;
   const byId = new Map(opts.events.map((e) => [e.id, e]));
   const exceptionStarts = new Map<string, Set<number>>();
   for (const e of opts.events) if (e.seriesId && e.recurrenceId != null) {
@@ -233,6 +248,8 @@ export function exportIcs(opts: { events: CalEvent[]; tasks?: Task[]; calendars:
     }
     const cal = calName.get(e.calendarId);
     if (cal) L.push(`X-AGENDA-CALENDAR:${escapeText(cal)}`);
+    if (opts.sequence != null) L.push(`SEQUENCE:${opts.sequence}`);
+    for (const line of opts.preserve?.get(master && e.recurrenceId != null ? String(e.recurrenceId) : "") ?? []) L.push(line);
     for (const lead of e.alerts) {
       L.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.title)}`, `TRIGGER:${alertToTrigger(lead, e.allDay)}`, "END:VALARM");
     }
@@ -260,6 +277,12 @@ export interface ImportResult {
   name: string | null;
   events: CalEvent[];
   tasks: Task[];
+  /** UID original de cada serie/evento importado (por id). */
+  uids: Map<string, string>;
+  /** Ids de series/eventos que Agenda no puede editar sin perder información (invitados, reglas raras). */
+  lossy: Set<string>;
+  /** LAST-MODIFIED (o DTSTAMP) más reciente de cada serie/evento. */
+  modified: Map<string, number>;
   /** Nombre de calendario de origen (X-AGENDA-CALENDAR) por id importado. */
   sourceCalendar: Map<string, string>;
   warnings: string[];
@@ -303,6 +326,9 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
   const sourceCalendar = new Map<string, string>();
   const masters = new Map<string, CalEvent>();
   const exceptions: { uid: string; ev: CalEvent }[] = [];
+  const uids = new Map<string, string>();
+  const lossyUids = new Set<string>();
+  const modifiedByUid = new Map<string, number>();
   let unsupported = 0;
 
   for (const c of cal.children.filter((x) => x.type === "VEVENT")) {
@@ -329,8 +355,15 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
     const rr = get(c, "RRULE");
     if (rr) {
       rrule = cleanRule(rr.value, start.ms);
-      if (!rrule) unsupported++;
+      if (!rrule) {
+        unsupported++;
+        lossyUids.add(uid);
+      }
     }
+    // Con invitados o fechas sueltas (RDATE) editar desde aquí podría estropear la invitación.
+    if (get(c, "ATTENDEE") || get(c, "RDATE")) lossyUids.add(uid);
+    const mod = parseDate(get(c, "LAST-MODIFIED") ?? get(c, "DTSTAMP"));
+    if (mod) modifiedByUid.set(uid, Math.max(modifiedByUid.get(uid) ?? 0, mod.ms));
     const recurrence = parseDate(get(c, "RECURRENCE-ID"));
     const ev: CalEvent = {
       id: recurrence ? `${idFromUid(uid)}-r${recurrence.ms}` : idFromUid(uid),
@@ -352,7 +385,10 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
     const src = get(c, "X-AGENDA-CALENDAR");
     if (src) sourceCalendar.set(ev.id, unescapeText(src.value));
     if (recurrence) exceptions.push({ uid, ev });
-    else masters.set(uid, ev);
+    else {
+      masters.set(uid, ev);
+      uids.set(ev.id, uid);
+    }
   }
 
   // Excepciones ("solo este"): se cuelgan de su serie y la serie se salta esa repetición.
@@ -361,6 +397,7 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
     if (!master || !master.rrule) {
       // Sin serie conocida: se importa como evento suelto.
       masters.set(`${uid}#${ev.recurrenceId}`, { ...ev, recurrenceId: null });
+      uids.set(ev.id, uid);
       continue;
     }
     ev.seriesId = master.id;
@@ -393,5 +430,38 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
 
   if (unsupported) warnings.push(`${unsupported} ${unsupported === 1 ? "evento repetido usa" : "eventos repetidos usan"} reglas que Agenda no entiende; se han importado solo con su primera fecha.`);
   const events = [...masters.values(), ...exceptions.filter((x) => x.ev.seriesId).map((x) => x.ev)];
-  return { name, events, tasks, sourceCalendar, warnings };
+  const lossy = new Set<string>();
+  const modified = new Map<string, number>();
+  for (const [id, uid] of uids) {
+    if (lossyUids.has(uid)) lossy.add(id);
+    const m = modifiedByUid.get(uid);
+    if (m != null) modified.set(id, m);
+  }
+  return { name, events, tasks, uids, lossy, modified, sourceCalendar, warnings };
+}
+
+/** Propiedades que Agenda genera; el resto (invitados, URL, X-APPLE-…) se conserva al subir cambios. */
+const MANAGED = new Set([
+  "UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "RECURRENCE-ID", "DTSTART", "DTEND", "DURATION", "SUMMARY",
+  "LOCATION", "DESCRIPTION", "RRULE", "EXDATE", "SEQUENCE", "X-AGENDA-CALENDAR",
+]);
+
+/**
+ * De un .ics remoto saca lo que hay que conservar al reescribirlo: líneas no gestionadas de cada
+ * VEVENT (clave "" para el maestro o el ms de RECURRENCE-ID) y el SEQUENCE siguiente.
+ */
+export function preservedFrom(raw: string): { preserve: Map<string, string[]>; sequence: number } {
+  const preserve = new Map<string, string[]>();
+  let sequence = 0;
+  try {
+    const cal = parseComponents(raw).find((c) => c.type === "VCALENDAR");
+    for (const c of cal?.children.filter((x) => x.type === "VEVENT") ?? []) {
+      const rid = parseDate(get(c, "RECURRENCE-ID"));
+      preserve.set(rid ? String(rid.ms) : "", c.props.filter((p) => !MANAGED.has(p.name)).map((p) => p.raw));
+      sequence = Math.max(sequence, Number(get(c, "SEQUENCE")?.value ?? 0) + 1);
+    }
+  } catch {
+    /* sin versión remota legible: nada que conservar */
+  }
+  return { preserve, sequence };
 }

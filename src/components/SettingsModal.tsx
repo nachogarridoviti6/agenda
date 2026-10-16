@@ -5,6 +5,7 @@ import type { Corner, MonitorInfo, ThemePref, WidgetConfig } from "../lib/types"
 import { Modal } from "./Modal";
 import { Row, Switch } from "./fields";
 import { ImportExportSection } from "./ImportExport";
+import { ICloudSection } from "./ICloudSection";
 
 const THEMES: { value: ThemePref; label: string }[] = [
   { value: "system", label: "Automático" },
@@ -160,6 +161,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             : "Arrastra la cabecera del widget para moverlo y sus bordes para cambiar el tamaño."}
           {!isTauri() && " (En el navegador el widget se abre en /widget.html.)"}
         </p>
+
+        <div className="f-section">iCloud</div>
+        <ICloudSection />
 
         <div className="f-section">Importar y exportar</div>
         <ImportExportSection />

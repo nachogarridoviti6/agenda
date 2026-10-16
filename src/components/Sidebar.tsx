@@ -2,7 +2,9 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { useStore } from "../store";
 import { useCalendarMap } from "../hooks";
 import { MiniMonth } from "./MiniMonth";
-import { Gear, Pencil, Plus } from "./icons";
+import { Cloud, Gear, Pencil, Plus } from "./icons";
+import { useCloud } from "../cloud";
+import { fmt } from "../lib/dates";
 import { compareTasks } from "../lib/occurrences";
 import { isOverdue, priorityMarks, taskDueLabel } from "../lib/format";
 
@@ -12,6 +14,7 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
   const { toggleCalendar, openCalendar, openNewCalendar, openTask, openNewTask, toggleTask } = useStore.getState();
   const calMap = useCalendarMap();
   const [showDone, setShowDone] = useState(false);
+  const { account, syncing, lastSync, error, linkedIds } = useCloud();
 
   const list = useMemo(
     () =>
@@ -38,6 +41,11 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
               <input type="checkbox" className="check square" checked={c.visible} onChange={() => toggleCalendar(c)} />
               <span>{c.name}</span>
             </label>
+            {linkedIds.has(c.id) && (
+              <span className="cloud-badge" title="Se sincroniza con iCloud">
+                <Cloud width={13} height={13} />
+              </span>
+            )}
             <button className="icon-btn sm cal-edit" onClick={() => openCalendar(c)} aria-label={`Editar ${c.name}`}>
               <Pencil width={12} height={12} />
             </button>
@@ -83,6 +91,16 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
         <button className="icon-btn" onClick={onSettings} aria-label="Ajustes" title="Ajustes">
           <Gear />
         </button>
+        {account && (
+          <button
+            className={`sync-status ${error ? "is-error" : ""}`}
+            onClick={() => void useCloud.getState().sync()}
+            title={error ?? "Sincronizar con iCloud ahora"}
+          >
+            <Cloud width={13} height={13} />
+            {syncing ? "Sincronizando…" : error ? "Error al sincronizar" : lastSync ? `iCloud · ${fmt(lastSync, "H:mm")}` : "iCloud"}
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "./store";
-import { useAlarmScheduler, useApplyTheme, useKeyboardShortcuts } from "./hooks";
+import { useAlarmScheduler, useApplyTheme, useCloudSync, useKeyboardShortcuts } from "./hooks";
 import { Toolbar } from "./components/Toolbar";
 import { Sidebar } from "./components/Sidebar";
 import { TimeGrid } from "./components/TimeGrid";
@@ -29,6 +29,7 @@ export function App() {
   useApplyTheme();
   useKeyboardShortcuts();
   useAlarmScheduler();
+  useCloudSync();
   useEffect(() => void useStore.getState().init(), []);
 
   if (!ready) return <div className="loading">{error ?? ""}</div>;

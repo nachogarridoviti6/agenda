@@ -11,7 +11,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 | 1 | App principal: vistas Semana y Mes, eventos, tareas, calendarios con color, persistencia, modo claro/oscuro | ✅ |
 | 2 | Widget anclado al escritorio, bandeja del sistema, arranque con Windows | ✅ |
 | 3 | Repeticiones, alertas, añadir rápido en lenguaje natural, vistas Día y Año, búsqueda | ✅ |
-| 4 | Importar/exportar `.ics` | ✅ (CalDAV con iCloud: pendiente de decidir) |
+| 4 | Importar/exportar `.ics` y sincronización con iCloud (CalDAV) | ✅ |
 | 5 | Instalador `.exe` pulido | ⏳ (ya se genera uno básico en cada build) |
 
 ## Instalar (lo normal)
@@ -78,6 +78,23 @@ Escribe una frase y verás una vista previa antes de crearla:
 - Al editar, mover o borrar una repetición, Agenda pregunta: **Solo este evento** o **Todos los futuros**.
 - Hasta **dos alertas** por evento: notificación nativa de Windows, aunque la ventana esté cerrada. Las de los eventos de todo el día suenan a las 9:00. Las tareas con hora avisan a su hora límite.
 
+### Sincronizar con iCloud (iPhone)
+
+**⚙️ Ajustes → iCloud.**
+
+1. En [account.apple.com](https://account.apple.com) → **Inicio de sesión y seguridad** → **Contraseñas específicas para apps**, crea una (por ejemplo, «Agenda PC»). Hace falta tener activada la verificación en dos pasos.
+2. En Agenda escribe tu Apple ID y esa contraseña (`xxxx-xxxx-xxxx-xxxx`) y pulsa **Conectar con iCloud**. La contraseña se guarda cifrada en el **Administrador de credenciales de Windows**, nunca en un archivo.
+3. Elige con qué calendario de Agenda se sincroniza cada calendario de iCloud. Los que se llaman igual se enlazan solos. Con **Crear en iCloud** subes Uni, Trabajo o Personal para tenerlos en el iPhone.
+
+Cómo funciona:
+
+- Se sincroniza al abrir la app, cada 10 minutos, al volver a la ventana y unos segundos después de cambiar algo. Apple no avisa de los cambios por CalDAV, así que lo que apuntes en el iPhone puede tardar hasta 10 minutos en aparecer (o pulsa la nube abajo a la izquierda).
+- Viajan los eventos con sus repeticiones, cambios puntuales y alertas. Al subir un cambio se conserva lo que Agenda no gestiona (invitados, enlaces, ajustes de Apple).
+- Si un evento cambia en los dos sitios a la vez, gana el cambio más reciente y Agenda te lo dice en Ajustes.
+- Las **invitaciones** (eventos con invitados) y las repeticiones que Agenda no entiende se muestran, pero no se reescriben desde el PC para no estropearlas (🔒 en el editor).
+- **Las tareas no se sincronizan**: Apple no permite acceder a Recordatorios por CalDAV desde iOS 13.
+- **Desconectar iCloud** borra la contraseña de Windows; los eventos se quedan en el PC.
+
 ### Importar y exportar (.ics)
 
 **⚙️ Ajustes → Importar y exportar.**
@@ -121,6 +138,7 @@ src-tauri/            Backend (Rust)
   src/widget.rs       Ventana del widget: monitor, posición, tamaño, acrílico, guardado al moverla
   src/desktop.rs      Anclaje al escritorio de Windows (Win32)
   src/tray.rs         Icono de la bandeja del sistema
+  src/caldav.rs       Cliente CalDAV de iCloud (HTTP, XML, contraseña en el Administrador de credenciales)
 src/                  Frontend (React + TS)
   lib/dates.ts        Fechas siempre en Europe/Madrid (cambios de hora incluidos)
   lib/layout.ts       Colocación de eventos solapados y barras de varios días
@@ -131,6 +149,7 @@ src/                  Frontend (React + TS)
   lib/alarms.ts       Cálculo de alertas (las dispara src-tauri/src/alarms.rs)
   lib/search.ts       Búsqueda
   lib/ics.ts          Importar y exportar iCalendar (.ics)
+  lib/sync.ts         Sincronización bidireccional con iCloud (y lib/fakecaldav.ts, un iCloud de pruebas)
   lib/backend.ts      Contrato con el backend: Tauri o simulado
   components/         Vistas, barra lateral, editores
   lib/widget.ts       Qué enseña el widget (semana y tareas)

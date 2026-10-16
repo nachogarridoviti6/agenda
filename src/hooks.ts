@@ -3,6 +3,7 @@ import { useStore } from "./store";
 import type { Calendar } from "./lib/types";
 import { backend, isTauri } from "./lib/backend";
 import { computeAlarms } from "./lib/alarms";
+import { useCloud, ignoreChangesUntil } from "./cloud";
 
 /** Hora actual que se refresca cada `ms` (por defecto 30 s), para la línea roja. */
 export function useNow(ms = 30_000): number {
@@ -112,4 +113,41 @@ export function useAlarmScheduler() {
       void off.then((f) => f());
     };
   }, []);
+}
+
+/**
+ * Sincroniza con iCloud: al abrir, cada 10 minutos, al volver a la ventana y unos segundos
+ * después de cambiar algo aquí.
+ */
+export function useCloudSync() {
+  const appleId = useCloud((s) => s.account?.appleId ?? null);
+  useEffect(() => {
+    void useCloud.getState().refresh();
+  }, []);
+  useEffect(() => {
+    if (!appleId) return;
+    const sync = () => void useCloud.getState().sync();
+    sync();
+    const id = setInterval(sync, 10 * 60_000);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    const off = backend.onChange((kind) => {
+      if (kind === "settings" || useCloud.getState().syncing || Date.now() < ignoreChangesUntil) return;
+      clearTimeout(debounce);
+      debounce = setTimeout(sync, 4000);
+    });
+    let lastFocus = 0;
+    const onFocus = () => {
+      if (Date.now() - lastFocus > 60_000) {
+        lastFocus = Date.now();
+        sync();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      clearTimeout(debounce);
+      window.removeEventListener("focus", onFocus);
+      void off.then((f) => f());
+    };
+  }, [appleId]);
 }

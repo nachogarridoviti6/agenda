@@ -45,3 +45,42 @@ pub struct Task {
     pub created_at: i64,
     pub updated_at: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncLink {
+    pub calendar_id: String,
+    pub url: String,
+    pub ctag: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncItem {
+    pub event_id: String,
+    pub calendar_id: String,
+    pub href: String,
+    pub etag: String,
+    pub uid: String,
+    pub raw: String,
+    pub synced_version: i64,
+    pub readonly: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SyncState {
+    pub links: Vec<SyncLink>,
+    pub items: Vec<SyncItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SyncCommit {
+    pub save_calendars: Vec<Calendar>,
+    pub upsert_links: Vec<SyncLink>,
+    pub delete_link_calendar_ids: Vec<String>,
+    pub save_events: Vec<CalEvent>,
+    pub delete_event_ids: Vec<String>,
+    pub upsert_items: Vec<SyncItem>,
+    pub delete_item_ids: Vec<String>,
+}

@@ -39,3 +39,6 @@ export const Pin = (p: SVGProps<SVGSVGElement>) => (
 export const Search = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>
 );
+export const Cloud = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M4.5 12.5h7a3 3 0 0 0 .4-6 4 4 0 0 0-7.6-1A3.5 3.5 0 0 0 4.5 12.5z" /></svg>
+);

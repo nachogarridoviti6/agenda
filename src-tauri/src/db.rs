@@ -1,6 +1,6 @@
 //! Persistencia en SQLite. Es la única fuente de verdad: las ventanas solo hablan con estos comandos.
 
-use crate::models::{CalEvent, Calendar, Task};
+use crate::models::{CalEvent, Calendar, SyncCommit, SyncItem, SyncLink, SyncState, Task};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::HashMap;
 use std::path::Path;
@@ -60,6 +60,25 @@ INSERT INTO calendars (id, name, color, visible, sort_order) VALUES
     ('cal-uni', 'Uni', '#007AFF', 1, 0),
     ('cal-trabajo', 'Trabajo', '#FF9500', 1, 1),
     ('cal-personal', 'Personal', '#34C759', 1, 2);
+"#, r#"
+-- Sincronización con iCloud (CalDAV)
+CREATE TABLE sync_links (
+    calendar_id  TEXT PRIMARY KEY REFERENCES calendars(id) ON DELETE CASCADE,
+    url          TEXT NOT NULL UNIQUE,
+    ctag         TEXT
+);
+-- Un recurso .ics remoto por serie/evento. Sin clave foránea a events: si el evento se borra
+-- en local, la fila queda como "lápida" para borrarlo también en iCloud.
+CREATE TABLE sync_items (
+    event_id        TEXT PRIMARY KEY,
+    calendar_id     TEXT NOT NULL,
+    href            TEXT NOT NULL,
+    etag            TEXT NOT NULL,
+    uid             TEXT NOT NULL,
+    raw             TEXT NOT NULL,
+    synced_version  INTEGER NOT NULL,
+    readonly        INTEGER NOT NULL DEFAULT 0
+);
 "#];
 
 pub struct Db {
@@ -269,6 +288,94 @@ impl Db {
         }
     }
 
+    // ---------- Sincronización ----------
+
+    pub fn sync_state(&self) -> DbResult<SyncState> {
+        let mut st = self.conn.prepare("SELECT calendar_id, url, ctag FROM sync_links").map_err(err)?;
+        let links = st
+            .query_map([], |r| Ok(SyncLink { calendar_id: r.get(0)?, url: r.get(1)?, ctag: r.get(2)? }))
+            .map_err(err)?
+            .collect::<Result<_, _>>()
+            .map_err(err)?;
+        let mut st = self
+            .conn
+            .prepare("SELECT event_id, calendar_id, href, etag, uid, raw, synced_version, readonly FROM sync_items")
+            .map_err(err)?;
+        let items = st
+            .query_map([], |r| {
+                Ok(SyncItem {
+                    event_id: r.get(0)?,
+                    calendar_id: r.get(1)?,
+                    href: r.get(2)?,
+                    etag: r.get(3)?,
+                    uid: r.get(4)?,
+                    raw: r.get(5)?,
+                    synced_version: r.get(6)?,
+                    readonly: r.get(7)?,
+                })
+            })
+            .map_err(err)?
+            .collect::<Result<_, _>>()
+            .map_err(err)?;
+        Ok(SyncState { links, items })
+    }
+
+    /// Aplica de golpe el resultado de una sincronización (todo o nada).
+    pub fn sync_commit(&self, c: &SyncCommit) -> DbResult<()> {
+        self.conn.execute_batch("BEGIN").map_err(err)?;
+        let result = (|| {
+            for cal in &c.save_calendars {
+                self.save_calendar(cal)?;
+            }
+            for id in &c.delete_link_calendar_ids {
+                self.conn.execute("DELETE FROM sync_links WHERE calendar_id = ?1", [id]).map_err(err)?;
+            }
+            for l in &c.upsert_links {
+                self.conn
+                    .execute(
+                        "INSERT INTO sync_links (calendar_id, url, ctag) VALUES (?1, ?2, ?3)
+                         ON CONFLICT(calendar_id) DO UPDATE SET url = ?2, ctag = ?3",
+                        params![l.calendar_id, l.url, l.ctag],
+                    )
+                    .map_err(err)?;
+            }
+            for id in &c.delete_event_ids {
+                self.conn.execute("DELETE FROM events WHERE id = ?1", [id]).map_err(err)?;
+            }
+            let (singles, exceptions): (Vec<_>, Vec<_>) = c.save_events.iter().partition(|e| e.series_id.is_none());
+            for e in singles.into_iter().chain(exceptions) {
+                self.save_event(e)?;
+            }
+            for id in &c.delete_item_ids {
+                self.conn.execute("DELETE FROM sync_items WHERE event_id = ?1", [id]).map_err(err)?;
+            }
+            for i in &c.upsert_items {
+                self.conn
+                    .execute(
+                        "INSERT INTO sync_items (event_id, calendar_id, href, etag, uid, raw, synced_version, readonly)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                         ON CONFLICT(event_id) DO UPDATE SET calendar_id = ?2, href = ?3, etag = ?4, uid = ?5,
+                            raw = ?6, synced_version = ?7, readonly = ?8",
+                        params![i.event_id, i.calendar_id, i.href, i.etag, i.uid, i.raw, i.synced_version, i.readonly],
+                    )
+                    .map_err(err)?;
+            }
+            Ok(())
+        })();
+        match result {
+            Ok(()) => self.conn.execute_batch("COMMIT").map_err(err),
+            Err(e) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                Err(e)
+            }
+        }
+    }
+
+    /// Olvida toda la sincronización (al desconectar iCloud). Los eventos se quedan.
+    pub fn sync_reset(&self) -> DbResult<()> {
+        self.conn.execute_batch("DELETE FROM sync_items; DELETE FROM sync_links;").map_err(err)
+    }
+
     // ---------- Tareas ----------
 
     pub fn list_tasks(&self) -> DbResult<Vec<Task>> {
@@ -446,6 +553,38 @@ mod tests {
         // Un evento inválido deshace todo el bloque.
         assert!(db.save_bulk(&[], &[ev("ok", 0, 10, None), ev("mal", 10, 0, None)], &[]).is_err());
         assert_eq!(db.all_events().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn estado_de_sincronizacion() {
+        let db = Db::open_in_memory().unwrap();
+        let item = SyncItem {
+            event_id: "a".into(),
+            calendar_id: "cal-uni".into(),
+            href: "https://x/a.ics".into(),
+            etag: "\"1\"".into(),
+            uid: "a@agenda".into(),
+            raw: "BEGIN:VCALENDAR".into(),
+            synced_version: 5,
+            readonly: false,
+        };
+        let commit = SyncCommit {
+            upsert_links: vec![SyncLink { calendar_id: "cal-uni".into(), url: "https://x/".into(), ctag: Some("c1".into()) }],
+            upsert_items: vec![item.clone()],
+            save_events: vec![ev("a", 0, 10, None)],
+            ..Default::default()
+        };
+        db.sync_commit(&commit).unwrap();
+        let st = db.sync_state().unwrap();
+        assert_eq!(st.items, vec![item]);
+        assert_eq!(st.links[0].ctag.as_deref(), Some("c1"));
+        // Borrar el calendario local quita el enlace pero deja la fila del recurso.
+        db.delete_calendar("cal-uni").unwrap();
+        let st = db.sync_state().unwrap();
+        assert!(st.links.is_empty());
+        assert_eq!(st.items.len(), 1);
+        db.sync_reset().unwrap();
+        assert!(db.sync_state().unwrap().items.is_empty());
     }
 
     #[test]

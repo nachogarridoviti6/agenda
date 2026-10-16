@@ -6,6 +6,7 @@ import { formatRRule, parseRRule, type Rule } from "../lib/rrule";
 import { shiftWeekday } from "../lib/series";
 import { RepeatEditor } from "./RepeatEditor";
 import { AlertsEditor } from "./AlertsEditor";
+import { useCloud } from "../cloud";
 import { Modal } from "./Modal";
 import { DateInput, TimeInput } from "./DateTimeInputs";
 import { CalendarSelect, DeleteButton, Row, Switch } from "./fields";
@@ -28,6 +29,7 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
   const [notes, setNotes] = useState(event.notes);
   const [armed, setArmed] = useState(false);
   const isException = event.seriesId != null;
+  const readonlyCloud = useCloud((s) => s.readonlyIds.has(event.seriesId ?? event.id));
 
   const start = allDay ? combine(startDay, "00:00") : combine(startDay, startTime);
   const end = allDay ? addDaysZ(combine(endDay, "00:00"), 1) : combine(endDay, endTime);
@@ -79,6 +81,9 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
         }}
       >
         <input className="f-title" autoFocus placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
+        {readonlyCloud && (
+          <div className="f-note">🔒 Es una invitación o usa una repetición que Agenda no sabe editar: los cambios se quedan en este PC y no se envían a iCloud. Cámbialo desde el iPhone.</div>
+        )}
         <div className="f-group">
           <Row label="Calendario">
             <CalendarSelect calendars={calendars} value={calendarId} onChange={setCalendarId} />
