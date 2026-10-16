@@ -1,3 +1,4 @@
+mod alarms;
 mod db;
 #[cfg(windows)]
 mod desktop;
@@ -73,6 +74,23 @@ fn delete_event(app: AppHandle, state: State<AppState>, id: String) -> CmdResult
     with_db(&state, |db| db.delete_event(&id))?;
     changed(&app, "events");
     Ok(())
+}
+
+#[tauri::command]
+fn list_all_events(state: State<AppState>) -> CmdResult<Vec<CalEvent>> {
+    with_db(&state, |db| db.all_events())
+}
+
+#[tauri::command]
+fn delete_exceptions_from(app: AppHandle, state: State<AppState>, series_id: String, from: i64) -> CmdResult<()> {
+    with_db(&state, |db| db.delete_exceptions_from(&series_id, from))?;
+    changed(&app, "events");
+    Ok(())
+}
+
+#[tauri::command]
+fn set_alarms(app: AppHandle, alarms: Vec<alarms::Alarm>) {
+    alarms::set(&app, alarms);
 }
 
 #[tauri::command]
@@ -178,6 +196,7 @@ pub fn run() {
     tauri::Builder::default()
         // Debe ir primero: si ya hay una Agenda abierta, la segunda solo enseña la ventana.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
@@ -187,6 +206,7 @@ pub fn run() {
 
             let handle = app.handle().clone();
             init_autostart(&handle);
+            alarms::start(&handle);
             tray::create(&handle)?;
             if let Err(e) = widget::apply(&handle) {
                 eprintln!("No se pudo mostrar el widget: {e}");
@@ -215,6 +235,9 @@ pub fn run() {
             get_event,
             save_event,
             delete_event,
+            list_all_events,
+            delete_exceptions_from,
+            set_alarms,
             list_tasks,
             save_task,
             delete_task,

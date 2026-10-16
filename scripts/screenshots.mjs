@@ -28,6 +28,13 @@ await shot("editor-evento", { act: (p) => p.locator(".ev", { hasText: "Grabació
 await shot("nuevo-evento-oscuro", { scheme: "dark", act: (p) => p.keyboard.press("n") });
 await shot("editor-tarea", { act: (p) => p.locator(".task-row", { hasText: "Entrega práctica" }).click() });
 await shot("ventana-pequena", { width: 860, height: 600 });
+await shot("dia", { act: (p) => p.keyboard.press("1") });
+await shot("anio", { act: (p) => p.keyboard.press("4") });
+await shot("anadir-rapido", { act: async (p) => { await p.keyboard.press("Control+k"); await p.keyboard.type("Grabación villa martes 10-13 #trabajo @Marbella"); } });
+await shot("anadir-rapido-tarea-oscuro", { scheme: "dark", act: async (p) => { await p.keyboard.press("Control+k"); await p.keyboard.type("Entrega práctica fabricación viernes 23:59 #uni"); } });
+await shot("busqueda", { act: async (p) => { await p.keyboard.press("Control+f"); await p.keyboard.type("calculo"); } });
+await shot("repeticion", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); } });
+await shot("solo-este-o-futuros", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); await p.getByPlaceholder("Título").fill("Cálculo II (examen)"); await p.getByRole("dialog").getByRole("button", { name: "Guardar" }).click(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
 
 // Widget sobre un "fondo de escritorio" simulado para ver la transparencia.

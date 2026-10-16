@@ -2,13 +2,19 @@ import { useState } from "react";
 import { useStore } from "../store";
 import type { CalEvent } from "../lib/types";
 import { addDaysZ, combine, dayKey, startOfDayZ, timeKey } from "../lib/dates";
+import { formatRRule, parseRRule, type Rule } from "../lib/rrule";
+import { shiftWeekday } from "../lib/series";
+import { RepeatEditor } from "./RepeatEditor";
+import { AlertsEditor } from "./AlertsEditor";
 import { Modal } from "./Modal";
 import { DateInput, TimeInput } from "./DateTimeInputs";
 import { CalendarSelect, DeleteButton, Row, Switch } from "./fields";
 
-export function EventEditor({ event, isNew }: { event: CalEvent; isNew: boolean }) {
+export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; isNew: boolean; isOccurrence?: boolean }) {
   const calendars = useStore((s) => s.calendars);
-  const { saveEvent, deleteEvent, closeEditor } = useStore.getState();
+  const { saveFromEditor, deleteFromEditor, closeEditor } = useStore.getState();
+  const [rule, setRule] = useState<Rule | null>(parseRRule(event.rrule));
+  const [alerts, setAlerts] = useState<number[]>(event.alerts);
 
   const [title, setTitle] = useState(event.title);
   const [calendarId, setCalendarId] = useState(event.calendarId);
@@ -21,6 +27,7 @@ export function EventEditor({ event, isNew }: { event: CalEvent; isNew: boolean 
   const [location, setLocation] = useState(event.location);
   const [notes, setNotes] = useState(event.notes);
   const [armed, setArmed] = useState(false);
+  const isException = event.seriesId != null;
 
   const start = allDay ? combine(startDay, "00:00") : combine(startDay, startTime);
   const end = allDay ? addDaysZ(combine(endDay, "00:00"), 1) : combine(endDay, endTime);
@@ -35,13 +42,17 @@ export function EventEditor({ event, isNew }: { event: CalEvent; isNew: boolean 
       setEndDay(dayKey(newEnd));
       if (!allDay) setEndTime(timeKey(newEnd));
     }
+    if (rule && !Number.isNaN(newStart) && !Number.isNaN(oldStart)) {
+      const shifted = parseRRule(shiftWeekday({ ...event, rrule: formatRRule(rule, allDay) }, oldStart, newStart));
+      if (shifted) setRule(shifted);
+    }
     setStartDay(day);
     setStartTime(time);
   };
 
   const submit = () => {
     if (invalid) return;
-    void saveEvent({
+    void saveFromEditor({
       ...event,
       title: title.trim() || "Nuevo evento",
       calendarId,
@@ -50,6 +61,8 @@ export function EventEditor({ event, isNew }: { event: CalEvent; isNew: boolean 
       end,
       location: location.trim(),
       notes,
+      alerts,
+      rrule: rule ? formatRRule(rule, allDay) : null,
     });
   };
 
@@ -84,11 +97,24 @@ export function EventEditor({ event, isNew }: { event: CalEvent; isNew: boolean 
           {invalid && <div className="f-error">El final tiene que ser posterior al inicio.</div>}
         </div>
         <div className="f-group">
+          {isException ? (
+            <div className="f-note">Es un cambio puntual de un evento que se repite.</div>
+          ) : (
+            <RepeatEditor rule={rule} start={start} onChange={setRule} />
+          )}
+          <AlertsEditor alerts={alerts} allDay={allDay} onChange={setAlerts} />
+        </div>
+        <div className="f-group">
           <input className="f-plain" placeholder="Ubicación" value={location} onChange={(e) => setLocation(e.target.value)} />
           <textarea className="f-plain" placeholder="Notas" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <div className="f-actions">
-          {!isNew && <DeleteButton label="Eliminar evento" armed={armed} onArm={() => setArmed(true)} onConfirm={() => deleteEvent(event.id)} />}
+          {!isNew &&
+            (isOccurrence ? (
+              <button type="button" className="btn danger" onClick={() => void deleteFromEditor()}>Eliminar evento</button>
+            ) : (
+              <DeleteButton label="Eliminar evento" armed={armed} onArm={() => setArmed(true)} onConfirm={() => void deleteFromEditor()} />
+            ))}
           <span className="spacer" />
           <button type="button" className="btn" onClick={closeEditor}>Cancelar</button>
           <button type="submit" className="btn primary" disabled={invalid}>{isNew ? "Añadir" : "Guardar"}</button>

@@ -1,6 +1,7 @@
 import type { CalEvent, Calendar, Corner, Id, MonitorInfo, Task, WidgetConfig } from "./types";
 import { DEFAULT_CALENDARS, DEFAULT_WIDGET } from "./defaults";
 import { demoData } from "./demo";
+import type { Alarm } from "./alarms";
 
 /**
  * Contrato con el backend. En la app real lo implementa Rust (SQLite) vía comandos de Tauri;
@@ -15,6 +16,11 @@ export interface Backend {
   /** Eventos que pueden aparecer en [from, to): los normales que solapan y todas las series que empiezan antes de `to`. */
   listEvents(from: number, to: number): Promise<CalEvent[]>;
   getEvent(id: Id): Promise<CalEvent | null>;
+  /** Todos los eventos (para la búsqueda). */
+  listAllEvents(): Promise<CalEvent[]>;
+  deleteExceptionsFrom(seriesId: Id, from: number): Promise<void>;
+  /** Alertas que el backend debe disparar como notificaciones de Windows. */
+  setAlarms(alarms: Alarm[]): Promise<void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -55,6 +61,9 @@ class TauriBackend implements Backend {
   deleteCalendar(id: Id) { return this.call<void>("delete_calendar", { id }); }
   listEvents(from: number, to: number) { return this.call<CalEvent[]>("list_events", { from, to }); }
   getEvent(id: Id) { return this.call<CalEvent | null>("get_event", { id }); }
+  listAllEvents() { return this.call<CalEvent[]>("list_all_events"); }
+  deleteExceptionsFrom(seriesId: Id, from: number) { return this.call<void>("delete_exceptions_from", { seriesId, from }); }
+  setAlarms(alarms: Alarm[]) { return this.call<void>("set_alarms", { alarms }); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -153,6 +162,13 @@ export class MockBackend implements Backend {
     );
   }
   async getEvent(id: Id) { return this.load().events.find((e) => e.id === id) ?? null; }
+  async listAllEvents() { return this.load().events; }
+  async deleteExceptionsFrom(seriesId: Id, from: number) {
+    const db = this.load();
+    db.events = db.events.filter((e) => !(e.seriesId === seriesId && (e.recurrenceId ?? 0) >= from));
+    this.save(db, "events");
+  }
+  async setAlarms() {}
   async saveEvent(e: CalEvent) { const db = this.load(); db.events = this.upsert(db.events, e); this.save(db, "events"); }
   async deleteEvent(id: Id) {
     const db = this.load();

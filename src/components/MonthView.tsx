@@ -41,7 +41,7 @@ export function MonthView() {
 
   const goWeek = (d: number) => {
     setCursor(d);
-    setView("week");
+    setView("day");
   };
 
   return (

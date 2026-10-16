@@ -45,18 +45,15 @@ export function demoData(now = Date.now()): { events: CalEvent[]; tasks: Task[] 
   });
 
   const events: CalEvent[] = [
-    ev("cal-uni", "Cálculo II", 0, 9, 11, { location: "Aula 1.2" }),
-    ev("cal-uni", "Cálculo II", 2, 9, 11, { location: "Aula 1.2" }),
-    ev("cal-uni", "Sistemas de fabricación", 1, 11.5, 13.5, { location: "Lab. 3" }),
-    ev("cal-uni", "Sistemas de fabricación", 3, 11.5, 13.5, { location: "Lab. 3" }),
+    ev("cal-uni", "Cálculo II", 0, 9, 11, { location: "Aula 1.2", rrule: "FREQ=WEEKLY;BYDAY=MO,WE", start: atMinutes(addDaysZ(mon, -28), 540), end: atMinutes(addDaysZ(mon, -28), 660) }),
+    ev("cal-uni", "Sistemas de fabricación", 1, 11.5, 13.5, { location: "Lab. 3", rrule: "FREQ=WEEKLY;BYDAY=TU,TH", start: atMinutes(addDaysZ(mon, -27), 690), end: atMinutes(addDaysZ(mon, -27), 810) }),
     ev("cal-trabajo", "Grabación villa Marbella", 1, 10, 13, { location: "Urb. Sierra Blanca" }),
     ev("cal-trabajo", "Reunión equipo marketing", 0, 16, 17),
     ev("cal-trabajo", "Edición vídeo ático", 2, 15, 18),
     ev("cal-trabajo", "Llamada cliente", 2, 16, 16.5),
     ev("cal-trabajo", "Sesión fotos piso centro", 4, 10, 12),
     ev("cal-uni", "Tutoría TFG", 4, 12.5, 13.25),
-    ev("cal-personal", "Gimnasio", 0, 19.5, 21),
-    ev("cal-personal", "Gimnasio", 3, 19.5, 21),
+    ev("cal-personal", "Gimnasio", 0, 19.5, 21, { rrule: "FREQ=WEEKLY;BYDAY=MO,TH", alerts: [30] }),
     ev("cal-personal", "Cena con amigos", 5, 21, 23.5, { location: "La Tagliatella" }),
     ev("cal-personal", "Pádel", 6, 11, 12.5),
     allDay("cal-trabajo", "Feria inmobiliaria SIMA", 2, 2),

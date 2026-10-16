@@ -10,7 +10,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 |---|---|---|
 | 1 | App principal: vistas Semana y Mes, eventos, tareas, calendarios con color, persistencia, modo claro/oscuro | ✅ |
 | 2 | Widget anclado al escritorio, bandeja del sistema, arranque con Windows | ✅ |
-| 3 | Repeticiones, alertas, añadir rápido en lenguaje natural, vistas Día y Año, búsqueda | ⏳ |
+| 3 | Repeticiones, alertas, añadir rápido en lenguaje natural, vistas Día y Año, búsqueda | ✅ |
 | 4 | Importar/exportar `.ics` (y CalDAV con iCloud, opcional) | ⏳ |
 | 5 | Instalador `.exe` pulido | ⏳ (ya se genera uno básico en cada build) |
 
@@ -28,11 +28,13 @@ Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db`.
 
 | Acción | Cómo |
 |---|---|
+| Añadir rápido (lenguaje natural) | `Ctrl+K`, menú `+` o bandeja → **Añadir rápido…** |
 | Nuevo evento | `N`, botón `+`, doble clic en un hueco o **arrastrar** en la rejilla |
 | Mover / cambiar duración | Arrastrar el evento / arrastrar su borde inferior |
 | Ir a hoy | `T` o botón **Hoy** |
 | Semana anterior / siguiente | `←` / `→` |
-| Vista Semana / Mes | `2` / `3` |
+| Vista Día / Semana / Mes / Año | `1` / `2` / `3` / `4` |
+| Buscar | `Ctrl+F` o `/` (eventos y tareas, sin importar acentos) |
 | Nueva tarea | `+` de **Tareas** en la barra lateral, o menú `+` |
 | Completar tarea | Clic en su círculo (en la barra lateral o en el calendario) |
 | Calendarios | Casilla para mostrar/ocultar, lápiz para renombrar, recolorear o borrar |
@@ -50,6 +52,31 @@ Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db`.
 - Sin bloquear, se mueve arrastrando la cabecera y cambia de tamaño desde los bordes (la posición se guarda sola).
 - **Bandeja del sistema**: abrir, mostrar u ocultar el widget, añadir rápido y salir.
 - Arranca con Windows: se activa la primera vez que abres la versión instalada y se puede quitar en Ajustes. Al iniciar sesión solo aparece el widget, sin la ventana principal.
+
+### Añadir rápido
+
+Escribe una frase y verás una vista previa antes de crearla:
+
+| Escribes | Se crea |
+|---|---|
+| `Entrega práctica fabricación viernes 23:59 #uni` | Tarea en Uni que vence el viernes a las 23:59 |
+| `Grabación villa martes 10-13 #trabajo @Marbella` | Evento en Trabajo el martes de 10:00 a 13:00 en Marbella |
+| `Cálculo cada lunes y miércoles 9-11 #uni` | Evento que se repite cada lunes y miércoles |
+| `Inglés cada jueves 18-19 hasta el 17/12` | Evento semanal con fecha de fin |
+| `Pagar alquiler el 1 !!` | Tarea con prioridad media el día 1 |
+| `Cena mañana a las 21:30` | Evento mañana de 21:30 a 22:30 |
+
+- `#calendario` (vale con el principio del nombre, p. ej. `#trab`), `@lugar` (hasta la siguiente coma o el final), `!` `!!` `!!!` o `!alta` para la prioridad.
+- Fechas: hoy, mañana, pasado mañana, lunes…domingo, próximo viernes, el 23, 23/10, 23 de octubre, 5 nov, dentro de 3 días, en 2 semanas.
+- Horas: 10:00, 10h, 9am, a las 9, 10-13, de 10 a 13, durante 90 min, todo el día.
+- Repetición: cada día, cada día laborable, cada lunes y miércoles, todos los martes, cada 2 semanas, cada mes, hasta el 20/12.
+- Es tarea si empieza por «Entrega», «Pagar», «Llamar», «Enviar», «Comprar»…, si lleva `!` o si vence a las 23:59. Para forzar el tipo, empieza con `tarea:` o `evento:`, o usa el selector Evento/Tarea de la vista previa.
+
+### Repeticiones y alertas
+
+- En el evento: **Repetir** (cada día, semana con días a elegir, cada 2 semanas, mes, año o personalizado) y **Termina** (nunca, en una fecha o tras N veces).
+- Al editar, mover o borrar una repetición, Agenda pregunta: **Solo este evento** o **Todos los futuros**.
+- Hasta **dos alertas** por evento: notificación nativa de Windows, aunque la ventana esté cerrada. Las de los eventos de todo el día suenan a las 9:00. Las tareas con hora avisan a su hora límite.
 
 Campos de hora: puedes escribir `9`, `930`, `9:30` o `21h`, y usar las flechas `↑`/`↓` para sumar o restar 15 minutos.
 
@@ -89,7 +116,12 @@ src-tauri/            Backend (Rust)
 src/                  Frontend (React + TS)
   lib/dates.ts        Fechas siempre en Europe/Madrid (cambios de hora incluidos)
   lib/layout.ts       Colocación de eventos solapados y barras de varios días
-  lib/occurrences.ts  Expansión de eventos en apariciones (aquí irán las repeticiones)
+  lib/occurrences.ts  Expansión de eventos en apariciones (series incluidas)
+  lib/rrule.ts        Repeticiones RRULE: leer, escribir, expandir y describir en español
+  lib/series.ts       "Solo este" / "Todos los futuros" al editar o borrar repeticiones
+  lib/nlp.ts          Añadir rápido en lenguaje natural
+  lib/alarms.ts       Cálculo de alertas (las dispara src-tauri/src/alarms.rs)
+  lib/search.ts       Búsqueda
   lib/backend.ts      Contrato con el backend: Tauri o simulado
   components/         Vistas, barra lateral, editores
   lib/widget.ts       Qué enseña el widget (semana y tareas)
@@ -97,7 +129,7 @@ src/                  Frontend (React + TS)
 ```
 
 - **Fechas**: se guardan como instantes UTC en ms. Todo lo que depende del día (qué día es, la semana, la hora que se muestra) se calcula en `Europe/Madrid`, con independencia de la zona horaria del PC. Los eventos de todo el día van de medianoche a medianoche, con fin exclusivo como en iCalendar.
-- **Repeticiones** (fase 3): se guardan como `RRULE` estándar (RFC 5545), con `EXDATE` y excepciones `RECURRENCE-ID`. Es el mismo modelo que usan `.ics` e iCloud.
+- **Repeticiones**: se guardan como `RRULE` estándar (RFC 5545), con `EXDATE` y excepciones `RECURRENCE-ID`. Es el mismo modelo que usan `.ics` e iCloud.
 
 ## Cómo se ancla el widget al escritorio
 

@@ -3,16 +3,19 @@ import { useStore } from "../store";
 import { capitalize, fmt, viewTitle } from "../lib/dates";
 import { ChevronLeft, ChevronRight, Plus, SidebarIcon } from "./icons";
 import type { ViewMode } from "../lib/types";
+import { SearchBox } from "./SearchBox";
 
 const VIEWS: { id: ViewMode; label: string; key: string }[] = [
+  { id: "day", label: "Día", key: "1" },
   { id: "week", label: "Semana", key: "2" },
   { id: "month", label: "Mes", key: "3" },
+  { id: "year", label: "Año", key: "4" },
 ];
 
 export function Toolbar() {
   const view = useStore((s) => s.view);
   const cursor = useStore((s) => s.cursor);
-  const { setView, step, goToday, toggleSidebar, openNewEvent, openNewTask } = useStore.getState();
+  const { setView, step, goToday, toggleSidebar, openNewEvent, openNewTask, openQuickAdd } = useStore.getState();
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -25,9 +28,14 @@ export function Toolbar() {
 
   // Título estilo Apple: mes en negrita y año en gris.
   const title = viewTitle(view, cursor);
-  const [main, year] = view === "month" || (view === "week" && /\d{4}$/.test(title))
-    ? [title.replace(/\s\d{4}$/, ""), title.match(/\d{4}$/)?.[0]]
-    : [title, undefined];
+  const [main, year] =
+    view === "year"
+      ? [title, undefined]
+      : view === "day"
+        ? [title.replace(/ de \d{4}$/, ""), title.match(/\d{4}$/)?.[0]]
+        : /\d{4}$/.test(title)
+          ? [title.replace(/\s\d{4}$/, ""), title.match(/\d{4}$/)?.[0]]
+          : [title, undefined];
 
   return (
     <header className="toolbar">
@@ -41,6 +49,9 @@ export function Toolbar() {
           </button>
           {menu && (
             <div className="menu">
+              <button onClick={() => { setMenu(false); openQuickAdd(true); }}>
+                Añadir rápido <kbd>Ctrl K</kbd>
+              </button>
               <button onClick={() => { setMenu(false); openNewEvent(); }}>
                 Nuevo evento <kbd>N</kbd>
               </button>
@@ -69,6 +80,7 @@ export function Toolbar() {
       </div>
 
       <div className="tb-right">
+        <SearchBox />
         <div className="nav-group">
           <button className="icon-btn" onClick={() => step(-1)} aria-label="Anterior" title="Anterior (←)">
             <ChevronLeft />

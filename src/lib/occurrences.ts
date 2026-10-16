@@ -1,13 +1,24 @@
 import type { CalEvent, Occurrence, Task } from "./types";
-import { dayKey } from "./dates";
+import { addDaysZ, dayDiff, dayKey } from "./dates";
+import { expandRule, parseRRule } from "./rrule";
 
 /**
  * Convierte los eventos guardados en apariciones concretas dentro de [from, to).
- * (Fase 3: aquí se expanden las series con RRULE y se aplican excepciones.)
+ * Las series (RRULE) se expanden saltándose sus EXDATE; las excepciones ("solo este")
+ * son eventos normales con `seriesId` y aparecen por su cuenta.
  */
 export function expandEvents(events: CalEvent[], from: number, to: number): Occurrence[] {
   const out: Occurrence[] = [];
   for (const e of events) {
+    const rule = parseRRule(e.rrule);
+    if (rule) {
+      const span = e.allDay ? dayDiff(e.end, e.start) : 0;
+      for (const start of expandRule(rule, e, from, to)) {
+        const end = e.allDay ? addDaysZ(start, span) : start + (e.end - e.start);
+        out.push({ key: `${e.id}@${start}`, event: e, start, end });
+      }
+      continue;
+    }
     if (e.start < to && e.end > from) out.push({ key: e.id, event: e, start: e.start, end: e.end });
     else if (e.start === e.end && e.start >= from && e.start < to) out.push({ key: e.id, event: e, start: e.start, end: e.end });
   }

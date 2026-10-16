@@ -186,7 +186,6 @@ impl Db {
         rows.collect::<Result<_, _>>().map_err(err)
     }
 
-    #[cfg(test)]
     pub fn all_events(&self) -> DbResult<Vec<CalEvent>> {
         let sql = format!("SELECT {} FROM events ORDER BY start_ts", Self::EVENT_COLS);
         let mut st = self.conn.prepare(&sql).map_err(err)?;
@@ -220,6 +219,17 @@ impl Db {
                     e.id, e.calendar_id, e.title, e.location, e.notes, e.all_day, e.start, e.end, e.rrule,
                     exdates, e.series_id, e.recurrence_id, alerts, e.created_at, e.updated_at
                 ],
+            )
+            .map_err(err)?;
+        Ok(())
+    }
+
+    /// Borra las excepciones ("solo este") de una serie a partir de un instante.
+    pub fn delete_exceptions_from(&self, series_id: &str, from: i64) -> DbResult<()> {
+        self.conn
+            .execute(
+                "DELETE FROM events WHERE series_id = ?1 AND recurrence_id >= ?2",
+                params![series_id, from],
             )
             .map_err(err)?;
         Ok(())
@@ -382,6 +392,21 @@ mod tests {
         db.save_event(&ex).unwrap();
         db.delete_event("serie").unwrap();
         assert!(db.all_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn borra_excepciones_desde_una_fecha() {
+        let db = Db::open_in_memory().unwrap();
+        db.save_event(&ev("serie", 0, 50, Some("FREQ=DAILY"))).unwrap();
+        for (id, rid) in [("ex1", 100), ("ex2", 200)] {
+            let mut ex = ev(id, rid, rid + 10, None);
+            ex.series_id = Some("serie".into());
+            ex.recurrence_id = Some(rid);
+            db.save_event(&ex).unwrap();
+        }
+        db.delete_exceptions_from("serie", 150).unwrap();
+        let ids: Vec<_> = db.all_events().unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids, ["serie", "ex1"]);
     }
 
     #[test]

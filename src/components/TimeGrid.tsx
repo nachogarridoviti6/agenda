@@ -20,7 +20,7 @@ type Drag =
 export function TimeGrid({ days }: { days: number[] }) {
   const events = useStore((s) => s.events);
   const tasks = useStore((s) => s.tasks);
-  const { openEvent, openNewEvent, openTask, toggleTask, saveEvent, setCursor, setView } = useStore.getState();
+  const { openEvent, openNewEvent, openTask, toggleTask, moveOccurrence, setCursor, setView } = useStore.getState();
   const calMap = useCalendarMap();
   const now = useNow();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -83,11 +83,11 @@ export function TimeGrid({ days }: { days: number[] }) {
         else {
           const start = atMinutes(days[d.day], d.startMin);
           const dur = d.occ.end - d.occ.start;
-          if (start !== d.occ.start) void saveEvent({ ...d.occ.event, start, end: start + dur });
+          if (start !== d.occ.start) void moveOccurrence(d.occ, start, start + dur);
         }
       } else {
         const end = atMinutes(days[d.day], d.endMin);
-        if (end !== d.occ.end) void saveEvent({ ...d.occ.event, end });
+        if (end !== d.occ.end) void moveOccurrence(d.occ, d.occ.start, end);
       }
     };
     window.addEventListener("pointermove", onMove);
@@ -128,7 +128,7 @@ export function TimeGrid({ days }: { days: number[] }) {
 
   const gotoDay = (d: number) => {
     setCursor(d);
-    if (days.length > 1) setView("week");
+    if (days.length > 1) setView("day");
   };
 
   const cols = `56px repeat(${days.length}, minmax(0, 1fr))`;
@@ -141,7 +141,7 @@ export function TimeGrid({ days }: { days: number[] }) {
         <div />
         {days.map((d, i) => (
           <div key={d} className={`tg-dayhead ${i === todayIdx ? "is-today" : ""}`} onClick={() => gotoDay(d)}>
-            <span className="tg-wd">{fmt(d, "EEE")}</span>
+            <span className="tg-wd">{fmt(d, days.length === 1 ? "EEEE" : "EEE")}</span>
             <span className="tg-num">{fmt(d, "d")}</span>
           </div>
         ))}

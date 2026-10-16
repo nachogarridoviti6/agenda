@@ -3,9 +3,11 @@ import { backend, newId } from "./lib/backend";
 import type { CalEvent, Calendar, Occurrence, Task, ThemePref, ViewMode } from "./lib/types";
 import { addDaysZ, startOfDayZ, stepCursor, viewRange } from "./lib/dates";
 import { DEFAULT_EVENT_MINUTES } from "./lib/defaults";
+import { deleteOccurrence, editOccurrence, shiftWeekday, type Scope, type SeriesOps } from "./lib/series";
 
 export type Editor =
-  | { kind: "event"; event: CalEvent; isNew: boolean }
+  /** `master` y `occStart` solo cuando se edita una repetición de una serie. */
+  | { kind: "event"; event: CalEvent; isNew: boolean; master?: CalEvent; occStart?: number }
   | { kind: "task"; task: Task; isNew: boolean }
   | { kind: "calendar"; calendar: Calendar; isNew: boolean }
   | null;
@@ -21,6 +23,10 @@ interface State {
   cursor: number;
   editor: Editor;
   sidebarOpen: boolean;
+  /** Pregunta "¿solo este o todos los futuros?" pendiente. */
+  scopePrompt: { action: "save" | "delete"; resolve(scope: Scope | null): void } | null;
+  quickAddOpen: boolean;
+  searchFocus: number;
 
   init(): Promise<void>;
   reload(kind?: string): Promise<void>;
@@ -41,6 +47,15 @@ interface State {
 
   saveEvent(e: CalEvent): Promise<void>;
   deleteEvent(id: string): Promise<void>;
+  /** Guarda lo editado en el editor (pregunta el alcance si es una repetición). */
+  saveFromEditor(draft: CalEvent): Promise<void>;
+  deleteFromEditor(): Promise<void>;
+  /** Mover/redimensionar arrastrando (pregunta el alcance si es una repetición). */
+  moveOccurrence(occ: Occurrence, start: number, end: number): Promise<void>;
+  askScope(action: "save" | "delete"): Promise<Scope | null>;
+  openQuickAdd(open?: boolean): void;
+  focusSearch(): void;
+  openOccurrenceAt(occ: Occurrence): void;
   saveTask(t: Task): Promise<void>;
   toggleTask(t: Task): Promise<void>;
   deleteTask(id: string): Promise<void>;
@@ -68,6 +83,9 @@ export const useStore = create<State>((set, get) => ({
   cursor: Date.now(),
   editor: null,
   sidebarOpen: true,
+  scopePrompt: null,
+  quickAddOpen: false,
+  searchFocus: 0,
 
   async init() {
     try {
@@ -75,17 +93,17 @@ export const useStore = create<State>((set, get) => ({
       const view = settings.lastView as ViewMode | undefined;
       set({
         theme: (settings.theme as ThemePref) ?? "system",
-        view: view === "week" || view === "month" ? view : "week",
+        view: view && ["day", "week", "month", "year"].includes(view) ? view : "week",
       });
       await get().reload();
       set({ ready: true });
       await backend.onChange((kind) => void get().reload(kind));
       // Doble clic en el widget o bandeja → abrir en un día / añadir rápido.
       await backend.onNavigate((day) => {
-        set({ editor: null });
+        set({ editor: null, view: "day" });
         get().setCursor(day);
       });
-      await backend.onQuickAdd(() => get().openNewEvent());
+      await backend.onQuickAdd(() => get().openQuickAdd(true));
     } catch (e) {
       fail(set, e);
     }
@@ -170,7 +188,15 @@ export const useStore = create<State>((set, get) => ({
     });
   },
   openEvent(occ) {
-    set({ editor: { kind: "event", isNew: false, event: { ...occ.event } } });
+    if (occ.event.rrule) {
+      // Repetición de una serie: el formulario muestra las fechas de esta repetición.
+      set({ editor: { kind: "event", isNew: false, event: { ...occ.event, start: occ.start, end: occ.end }, master: occ.event, occStart: occ.start } });
+    } else set({ editor: { kind: "event", isNew: false, event: { ...occ.event } } });
+  },
+  openOccurrenceAt(occ) {
+    set({ cursor: occ.start });
+    void get().reload("events");
+    get().openEvent(occ);
   },
   openNewTask(opts = {}) {
     const { calendars } = get();
@@ -228,6 +254,47 @@ export const useStore = create<State>((set, get) => ({
     } catch (err) {
       fail(set, err);
     }
+  },
+  askScope(action) {
+    return new Promise((resolve) =>
+      set({
+        scopePrompt: {
+          action,
+          resolve: (scope) => {
+            set({ scopePrompt: null });
+            resolve(scope);
+          },
+        },
+      }),
+    );
+  },
+  async saveFromEditor(draft) {
+    const ed = get().editor;
+    if (ed?.kind !== "event" || !ed.master || ed.occStart == null) return get().saveEvent(draft);
+    const scope = await get().askScope("save");
+    if (!scope) return;
+    await applyOps(editOccurrence(ed.master, ed.occStart, draft, scope, newId), set, get);
+  },
+  async deleteFromEditor() {
+    const ed = get().editor;
+    if (ed?.kind !== "event") return;
+    if (!ed.master || ed.occStart == null) return get().deleteEvent(ed.event.id);
+    const scope = await get().askScope("delete");
+    if (!scope) return;
+    await applyOps(deleteOccurrence(ed.master, ed.occStart, scope), set, get);
+  },
+  async moveOccurrence(occ, start, end) {
+    if (!occ.event.rrule) return get().saveEvent({ ...occ.event, start, end });
+    const scope = await get().askScope("save");
+    if (!scope) return;
+    const draft = { ...occ.event, start, end, rrule: shiftWeekday(occ.event, occ.start, start) };
+    await applyOps(editOccurrence(occ.event, occ.start, draft, scope, newId), set, get);
+  },
+  openQuickAdd(open = true) {
+    set({ quickAddOpen: open });
+  },
+  focusSearch() {
+    set((s) => ({ searchFocus: s.searchFocus + 1 }));
   },
   async deleteEvent(id) {
     try {
@@ -295,3 +362,16 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 }));
+
+async function applyOps(ops: SeriesOps, set: (p: Partial<State>) => void, get: () => State) {
+  try {
+    if (ops.deleteExceptionsFrom) await backend.deleteExceptionsFrom(ops.deleteExceptionsFrom.seriesId, ops.deleteExceptionsFrom.from);
+    for (const e of ops.save) await backend.saveEvent({ ...e, updatedAt: Date.now() });
+    for (const id of ops.delete) await backend.deleteEvent(id);
+    set({ editor: null });
+    await get().reload("events");
+  } catch (err) {
+    fail(set, err);
+  }
+}
+
