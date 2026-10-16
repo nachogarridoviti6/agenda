@@ -80,6 +80,12 @@ export const useStore = create<State>((set, get) => ({
       await get().reload();
       set({ ready: true });
       await backend.onChange((kind) => void get().reload(kind));
+      // Doble clic en el widget o bandeja → abrir en un día / añadir rápido.
+      await backend.onNavigate((day) => {
+        set({ editor: null });
+        get().setCursor(day);
+      });
+      await backend.onQuickAdd(() => get().openNewEvent());
     } catch (e) {
       fail(set, e);
     }

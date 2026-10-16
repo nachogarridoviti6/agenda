@@ -1,5 +1,5 @@
-import type { CalEvent, Calendar, Id, Task } from "./types";
-import { DEFAULT_CALENDARS } from "./defaults";
+import type { CalEvent, Calendar, Corner, Id, MonitorInfo, Task, WidgetConfig } from "./types";
+import { DEFAULT_CALENDARS, DEFAULT_WIDGET } from "./defaults";
 import { demoData } from "./demo";
 
 /**
@@ -28,6 +28,19 @@ export interface Backend {
 
   /** Se llama cuando cualquier ventana cambia datos. Devuelve la función para dejar de escuchar. */
   onChange(cb: (kind: string) => void): Promise<() => void>;
+
+  // Widget y sistema
+  getWidgetConfig(): Promise<WidgetConfig>;
+  setWidgetConfig(c: WidgetConfig): Promise<void>;
+  snapWidget(corner: Corner): Promise<void>;
+  listMonitors(): Promise<MonitorInfo[]>;
+  /** Abre la ventana principal (y navega a `day` si se indica). */
+  openMain(day?: number): Promise<void>;
+  getAutostart(): Promise<boolean>;
+  setAutostart(enabled: boolean): Promise<void>;
+  /** Eventos de la bandeja / del widget dirigidos a la ventana principal. */
+  onNavigate(cb: (day: number) => void): Promise<() => void>;
+  onQuickAdd(cb: () => void): Promise<() => void>;
 }
 
 export const isTauri = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -53,6 +66,21 @@ class TauriBackend implements Backend {
     const { listen } = await import("@tauri-apps/api/event");
     return listen<string>("data-changed", (e) => cb(e.payload));
   }
+  getWidgetConfig() { return this.call<WidgetConfig>("widget_get_config"); }
+  setWidgetConfig(config: WidgetConfig) { return this.call<void>("widget_set_config", { config }); }
+  snapWidget(corner: Corner) { return this.call<void>("widget_snap", { corner }); }
+  listMonitors() { return this.call<MonitorInfo[]>("list_monitors"); }
+  openMain(day?: number) { return this.call<void>("open_main", { day: day ?? null }); }
+  getAutostart() { return this.call<boolean>("get_autostart"); }
+  setAutostart(enabled: boolean) { return this.call<void>("set_autostart", { enabled }); }
+  async onNavigate(cb: (day: number) => void) {
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    return getCurrentWebviewWindow().listen<number>("navigate", (e) => cb(e.payload));
+  }
+  async onQuickAdd(cb: () => void) {
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    return getCurrentWebviewWindow().listen("quick-add", () => cb());
+  }
 }
 
 interface MockDb {
@@ -68,32 +96,42 @@ export class MockBackend implements Backend {
   private channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("agenda") : null;
   private listeners = new Set<(k: string) => void>();
   private memory: MockDb | null = null;
+  /** Con datos de ejemplo se trabaja solo en memoria (no se toca lo guardado). */
+  private memoryOnly = false;
 
   constructor(seed?: Partial<MockDb>) {
-    if (seed) this.memory = { calendars: DEFAULT_CALENDARS, events: [], tasks: [], settings: {}, ...seed };
-    this.channel?.addEventListener("message", (e) => this.listeners.forEach((l) => l(String(e.data))));
+    if (seed) {
+      this.memory = { calendars: DEFAULT_CALENDARS, events: [], tasks: [], settings: {}, ...seed };
+      this.memoryOnly = true;
+    }
+    this.channel?.addEventListener("message", (e) => {
+      if (!String(e.data).startsWith("navigate:")) this.listeners.forEach((l) => l(String(e.data)));
+    });
   }
 
   private load(): MockDb {
-    if (this.memory) return this.memory;
-    try {
-      const raw = localStorage.getItem(this.key);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      /* sin almacenamiento: seguimos en memoria */
+    if (!this.memoryOnly) {
+      try {
+        const raw = localStorage.getItem(this.key);
+        if (raw) return JSON.parse(raw);
+      } catch {
+        /* sin almacenamiento: seguimos en memoria */
+      }
     }
-    this.memory = { calendars: [...DEFAULT_CALENDARS], events: [], tasks: [], settings: {} };
+    this.memory ??= { calendars: [...DEFAULT_CALENDARS], events: [], tasks: [], settings: {} };
     return this.memory;
   }
   private save(db: MockDb, kind: string) {
-    try {
-      localStorage.setItem(this.key, JSON.stringify(db));
-      this.memory = null;
-    } catch {
-      this.memory = db;
+    this.memory = db;
+    if (!this.memoryOnly) {
+      try {
+        localStorage.setItem(this.key, JSON.stringify(db));
+      } catch {
+        /* se queda en memoria */
+      }
     }
     this.listeners.forEach((l) => l(kind));
-    this.channel?.postMessage(kind);
+    if (!this.memoryOnly) this.channel?.postMessage(kind);
   }
   private upsert<T extends { id: Id }>(list: T[], item: T): T[] {
     const i = list.findIndex((x) => x.id === item.id);
@@ -130,6 +168,27 @@ export class MockBackend implements Backend {
     this.listeners.add(cb);
     return () => void this.listeners.delete(cb);
   }
+  async getWidgetConfig() { return { ...DEFAULT_WIDGET, ...(this.load().settings.widget as Partial<WidgetConfig> | undefined) }; }
+  async setWidgetConfig(c: WidgetConfig) { await this.setSetting("widget", c); }
+  async snapWidget(corner: Corner) {
+    const c = await this.getWidgetConfig();
+    await this.setWidgetConfig({ ...c, positionSet: true, x: corner.endsWith("l") ? 24 : 1440 - c.width - 24, y: corner.startsWith("t") ? 24 : 900 - c.height - 24 });
+  }
+  async listMonitors(): Promise<MonitorInfo[]> {
+    return [{ name: "navegador", label: "Pantalla 1 (principal) — 1440×960", width: 1440, height: 960, scale: 2, primary: true }];
+  }
+  async openMain(day?: number) { this.channel?.postMessage(`navigate:${day ?? ""}`); }
+  async getAutostart() { return Boolean(this.load().settings.autostart ?? true); }
+  async setAutostart(enabled: boolean) { await this.setSetting("autostart", enabled); }
+  async onNavigate(cb: (day: number) => void) {
+    const l = (e: MessageEvent) => {
+      const m = String(e.data).match(/^navigate:(\d*)$/);
+      if (m && m[1]) cb(Number(m[1]));
+    };
+    this.channel?.addEventListener("message", l);
+    return () => this.channel?.removeEventListener("message", l);
+  }
+  async onQuickAdd() { return () => {}; }
 }
 
 function browserBackend(): Backend {

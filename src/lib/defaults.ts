@@ -1,4 +1,4 @@
-import type { Calendar } from "./types";
+import type { Calendar, WidgetConfig } from "./types";
 
 /** Paleta tipo Apple. El evento se pinta con el color suavizado (pastel) y una barra intensa. */
 export const PALETTE = [
@@ -20,3 +20,18 @@ export const DEFAULT_CALENDARS: Calendar[] = [
 ];
 
 export const DEFAULT_EVENT_MINUTES = 60;
+
+/** Igual que `WidgetConfig::default()` en Rust. */
+export const DEFAULT_WIDGET: WidgetConfig = {
+  visible: true,
+  monitor: null,
+  x: 0,
+  y: 0,
+  width: 760,
+  height: 380,
+  positionSet: false,
+  locked: false,
+  acrylic: true,
+  opacity: 0.72,
+  theme: "system",
+};

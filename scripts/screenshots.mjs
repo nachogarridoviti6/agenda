@@ -28,4 +28,14 @@ await shot("editor-evento", { act: (p) => p.locator(".ev", { hasText: "Grabació
 await shot("nuevo-evento-oscuro", { scheme: "dark", act: (p) => p.keyboard.press("n") });
 await shot("editor-tarea", { act: (p) => p.locator(".task-row", { hasText: "Entrega práctica" }).click() });
 await shot("ventana-pequena", { width: 860, height: 600 });
+await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
+
+// Widget sobre un "fondo de escritorio" simulado para ver la transparencia.
+const wallpaper = (p) =>
+  p.addStyleTag({ content: "html.widget{background:linear-gradient(135deg,#3a6186,#89253e) !important} html.widget body{padding:20px}" });
+const wallpaperLight = (p) =>
+  p.addStyleTag({ content: "html.widget{background:linear-gradient(135deg,#a8c0ff,#fbc2eb) !important} html.widget body{padding:20px}" });
+await shot("widget-claro", { path: "/widget.html?demo", width: 800, height: 420, act: wallpaperLight });
+await shot("widget-oscuro", { path: "/widget.html?demo", scheme: "dark", width: 800, height: 420, act: wallpaper });
+await shot("widget-estrecho", { path: "/widget.html?demo", width: 520, height: 520, act: wallpaperLight });
 await browser.close();

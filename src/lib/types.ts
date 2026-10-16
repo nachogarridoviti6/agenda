@@ -63,3 +63,28 @@ export interface Occurrence {
 
 export type ViewMode = "day" | "week" | "month" | "year";
 export type ThemePref = "system" | "light" | "dark";
+
+export interface WidgetConfig {
+  visible: boolean;
+  monitor: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  positionSet: boolean;
+  locked: boolean;
+  acrylic: boolean;
+  opacity: number;
+  theme: ThemePref;
+}
+
+export interface MonitorInfo {
+  name: string;
+  label: string;
+  width: number;
+  height: number;
+  scale: number;
+  primary: boolean;
+}
+
+export type Corner = "tl" | "tr" | "bl" | "br";

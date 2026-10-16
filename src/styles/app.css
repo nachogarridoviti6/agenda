@@ -832,7 +832,7 @@ kbd {
 }
 .f-label {
   flex: none;
-  width: 100px;
+  width: 140px;
   color: var(--text);
 }
 .f-control {
@@ -987,4 +987,25 @@ kbd {
 .mini-day.is-today-text {
   color: var(--red);
   font-weight: 600;
+}
+
+.f-value {
+  width: 56px;
+  text-align: right;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.f-control input[type="range"] {
+  flex: 1;
+  max-width: 220px;
+  accent-color: var(--accent);
+}
+.f-muted {
+  color: var(--text-3);
+}
+.f-help {
+  margin: -4px 2px 0;
+  font-size: 11.5px;
+  color: var(--text-2);
 }

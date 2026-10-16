@@ -1,11 +1,20 @@
 mod db;
+#[cfg(windows)]
+mod desktop;
 mod models;
+mod tray;
+mod widget;
 
 use db::Db;
 use models::{CalEvent, Calendar, Task};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use widget::{MonitorInfo, WidgetConfig};
+
+/// Argumento con el que Windows lanza la app al iniciar sesión: arranca sin abrir la ventana principal.
+const AUTOSTART_ARG: &str = "--autostart";
 
 pub struct AppState {
     db: Mutex<Db>,
@@ -97,14 +106,105 @@ fn set_setting(app: AppHandle, state: State<AppState>, key: String, value: serde
     Ok(())
 }
 
+// ---------- Widget, ventana principal y sistema ----------
+
+#[tauri::command]
+fn widget_get_config(app: AppHandle) -> WidgetConfig {
+    widget::load_config(&app)
+}
+
+#[tauri::command]
+fn widget_set_config(app: AppHandle, config: WidgetConfig) -> CmdResult<()> {
+    widget::save_config(&app, &config)?;
+    widget::apply(&app)?;
+    tray::sync_widget_item(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn widget_snap(app: AppHandle, corner: String) -> CmdResult<()> {
+    widget::snap_to(&app, &corner)
+}
+
+#[tauri::command]
+fn list_monitors(app: AppHandle) -> Vec<MonitorInfo> {
+    widget::list_monitors(&app)
+}
+
+/// Abre (o trae al frente) la ventana principal; si se indica un día, navega a él.
+#[tauri::command]
+fn open_main(app: AppHandle, day: Option<i64>) {
+    show_main(&app, day);
+}
+
+#[tauri::command]
+fn get_autostart(app: AppHandle) -> CmdResult<bool> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> CmdResult<()> {
+    let al = app.autolaunch();
+    if enabled { al.enable() } else { al.disable() }.map_err(|e| e.to_string())
+}
+
+pub fn show_main(app: &AppHandle, day: Option<i64>) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        if let Some(day) = day {
+            let _ = app.emit_to("main", "navigate", day);
+        }
+    }
+}
+
+/// La primera vez que se ejecuta la versión instalada, activa el arranque con Windows.
+fn init_autostart(app: &AppHandle) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    let state = app.state::<AppState>();
+    let Ok(db) = state.db.lock() else { return };
+    let done = db.get_settings().map(|s| s.contains_key("autostartInitialized")).unwrap_or(true);
+    if !done {
+        let _ = app.autolaunch().enable();
+        let _ = db.set_setting("autostartInitialized", &serde_json::json!(true));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Debe ir primero: si ya hay una Agenda abierta, la segunda solo enseña la ventana.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let db = Db::open(&dir.join("agenda.db"))?;
             app.manage(AppState { db: Mutex::new(db) });
+
+            let handle = app.handle().clone();
+            init_autostart(&handle);
+            tray::create(&handle)?;
+            if let Err(e) = widget::apply(&handle) {
+                eprintln!("No se pudo mostrar el widget: {e}");
+            }
+
+            let main = app.get_webview_window("main").expect("falta la ventana principal");
+            // Cerrar la ventana principal la esconde; la app sigue en la bandeja con el widget.
+            let m = main.clone();
+            main.on_window_event(move |e| {
+                if let WindowEvent::CloseRequested { api, .. } = e {
+                    api.prevent_close();
+                    let _ = m.hide();
+                }
+            });
+            if !std::env::args().any(|a| a == AUTOSTART_ARG) {
+                main.show()?;
+                main.set_focus()?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -120,6 +220,13 @@ pub fn run() {
             delete_task,
             get_settings,
             set_setting,
+            widget_get_config,
+            widget_set_config,
+            widget_snap,
+            list_monitors,
+            open_main,
+            get_autostart,
+            set_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error al arrancar Agenda");
