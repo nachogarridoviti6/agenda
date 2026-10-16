@@ -191,7 +191,5 @@ Lo que hace `src-tauri/src/desktop.rs`:
 
 ## Publicar una versión nueva
 
-1. Sube el número de versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json`.
-2. `git tag v1.0.1 && git push origin v1.0.1`
-
-GitHub Actions compila el instalador y crea la Release con el `.exe` adjunto.
+Sube el número de versión en `package.json`, `src-tauri/Cargo.toml` y `src-tauri/tauri.conf.json` y sube el cambio a `main`.
+Si esa versión aún no tiene Release, GitHub Actions compila el instalador, crea la etiqueta `vX.Y.Z` y publica la Release con el `.exe` adjunto.
