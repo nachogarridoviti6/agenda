@@ -70,3 +70,34 @@ describe("shortDue", () => {
     expect(shortDue(task("a", combine("2026-10-12", "00:00")), now)).toBe("lun 12");
   });
 });
+
+import { buildToday, nextUp, untilLabel } from "./widget";
+import { expandEvents } from "./occurrences";
+
+describe("ahora / siguiente", () => {
+  const occs = (evs: CalEvent[]) => expandEvents(evs, combine("2026-10-16", "00:00"), combine("2026-10-19", "00:00"));
+  it("evento en curso", () => {
+    const r = nextUp(occs([ev("Cálculo", "2026-10-16", "09:00", "11:00"), ev("Luego", "2026-10-16", "12:00", "13:00")]), now);
+    expect(r).toMatchObject({ kind: "now", label: "hasta las 11:00" });
+    expect(r!.occ.event.title).toBe("Cálculo");
+  });
+  it("siguiente evento con cuánto falta", () => {
+    const r = nextUp(occs([ev("Tutoría", "2026-10-16", "12:30", "13:15"), ev("Fiesta", "2026-10-17", "22:00", "23:00")]), now);
+    expect(r).toMatchObject({ kind: "next", label: "en 2 h 30 min" });
+  });
+  it("ignora todo el día y lo que está a más de 48 h", () => {
+    const allDay = { ...ev("Feria", "2026-10-16", "00:00", "00:00"), allDay: true, end: combine("2026-10-17", "00:00") };
+    expect(nextUp(occs([allDay, ev("Lejos", "2026-10-18", "12:00", "13:00")]), now)).toBeNull();
+  });
+  it("etiquetas de tiempo", () => {
+    expect(untilLabel(now + 25 * 60_000, now)).toBe("en 25 min");
+    expect(untilLabel(now + 3 * 3600_000, now)).toBe("en 3 h");
+    expect(untilLabel(combine("2026-10-17", "09:00"), now)).toBe("mañana a las 9:00");
+    expect(untilLabel(combine("2026-10-18", "09:00"), now)).toBe("domingo a las 9:00");
+  });
+  it("modo Hoy: hoy y mañana ordenados", () => {
+    const r = buildToday(DEFAULT_CALENDARS, [ev("B", "2026-10-16", "12:00", "13:00"), ev("A", "2026-10-16", "09:00", "10:00"), ev("M", "2026-10-17", "10:00", "11:00")], now);
+    expect(r.today.map((o) => o.event.title)).toEqual(["A", "B"]);
+    expect(r.tomorrow.map((o) => o.event.title)).toEqual(["M"]);
+  });
+});

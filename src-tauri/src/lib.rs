@@ -382,6 +382,13 @@ async fn open_main(app: AppHandle, day: Option<i64>) {
     show_main(&app, day);
 }
 
+/// Desde el widget: abre la ventana principal con "Añadir rápido".
+#[tauri::command]
+async fn open_quick_add(app: AppHandle) {
+    show_main(&app, None);
+    let _ = app.emit_to("main", "quick-add", ());
+}
+
 #[tauri::command]
 async fn get_autostart(app: AppHandle) -> CmdResult<bool> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
@@ -499,6 +506,7 @@ pub fn run() {
             widget_snap,
             list_monitors,
             open_main,
+            open_quick_add,
             get_autostart,
             set_autostart,
         ])

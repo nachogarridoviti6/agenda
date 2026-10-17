@@ -92,6 +92,12 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             <Row label="Mostrar">
               <Switch checked={widget.visible} onChange={(visible) => update({ visible })} label="Mostrar widget" />
             </Row>
+            <Row label="Vista">
+              <div className="segmented small">
+                <button className={widget.layout === "week" ? "is-active" : ""} onClick={() => update({ layout: "week" })}>Semana</button>
+                <button className={widget.layout === "today" ? "is-active" : ""} onClick={() => update({ layout: "today" })}>Hoy y mañana</button>
+              </div>
+            </Row>
             <Row label="Bloquear posición">
               <Switch checked={widget.locked} onChange={(locked) => update({ locked })} label="Bloquear posición" />
             </Row>

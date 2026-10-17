@@ -31,6 +31,8 @@ pub struct WidgetConfig {
     pub opacity: f64,
     /// "system" | "light" | "dark". La aplica el propio widget.
     pub theme: String,
+    /// "week" (semana completa) | "today" (agenda de hoy y mañana).
+    pub layout: String,
 }
 
 impl Default for WidgetConfig {
@@ -47,6 +49,7 @@ impl Default for WidgetConfig {
             acrylic: true,
             opacity: 0.72,
             theme: "system".into(),
+            layout: "week".into(),
         }
     }
 }
@@ -298,6 +301,7 @@ mod tests {
         assert!(cfg.visible);
         assert_eq!(cfg.width, 760.0);
         assert_eq!(cfg.theme, "system");
+        assert_eq!(cfg.layout, "week");
     }
 
     #[test]

@@ -34,4 +34,5 @@ export const DEFAULT_WIDGET: WidgetConfig = {
   acrylic: true,
   opacity: 0.72,
   theme: "system",
+  layout: "week",
 };

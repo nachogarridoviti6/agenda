@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.4_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.5_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -52,7 +52,9 @@ Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db` (⚙️ Aj
 
 ### Widget de escritorio
 
-- Muestra la semana actual (lunes–domingo) y las tareas pendientes de la semana, incluidas las atrasadas.
+- Dos vistas: **Semana** (lunes–domingo) o **Hoy y mañana** (agenda con horas y lugares), siempre con las tareas pendientes de la semana, incluidas las atrasadas.
+- Arriba, **Ahora** (el evento en curso y hasta cuándo) o **Siguiente** (el próximo y cuánto falta).
+- El botón **+** abre «Añadir rápido» en la app.
 - Se actualiza al instante cuando cambias algo en la app.
 - **Doble clic** en un día o un evento abre la app en ese día. Doble clic en la cabecera abre la app en hoy.
 - Las tareas se pueden marcar como hechas desde el propio widget.

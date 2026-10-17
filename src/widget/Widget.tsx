@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { backend } from "../lib/backend";
 import { DEFAULT_WIDGET } from "../lib/defaults";
-import { addDaysZ, fmt, hm, startOfWeekZ } from "../lib/dates";
-import { buildWidgetWeek, shortDue, type WidgetDay } from "../lib/widget";
+import { addDaysZ, capitalize, fmt, hm, startOfWeekZ } from "../lib/dates";
+import { buildToday, buildWidgetWeek, nextUp, shortDue, type WidgetDay } from "../lib/widget";
+import { expandEvents } from "../lib/occurrences";
 import { isOverdue } from "../lib/format";
 import type { CalEvent, Calendar, Occurrence, Task, WidgetConfig } from "../lib/types";
 
@@ -22,7 +23,8 @@ export function Widget() {
     async (kind?: string) => {
       if (!kind || kind === "settings") setConfig(await backend.getWidgetConfig());
       if (!kind || kind === "calendars") setCalendars(await backend.listCalendars());
-      if (!kind || kind === "events" || kind === "calendars") setEvents(await backend.listEvents(weekStart, addDaysZ(weekStart, 7)));
+      // La semana más 2 días, para "Siguiente" y "Mañana" aunque sea domingo.
+      if (!kind || kind === "events" || kind === "calendars") setEvents(await backend.listEvents(weekStart, addDaysZ(weekStart, 9)));
       if (!kind || kind === "tasks" || kind === "calendars") setTasks(await backend.listTasks());
     },
     [weekStart],
@@ -49,6 +51,11 @@ export function Widget() {
 
   const week = useMemo(() => buildWidgetWeek(calendars, events, tasks, now, keep), [calendars, events, tasks, now, keep]);
   const colorOf = useMemo(() => new Map(calendars.map((c) => [c.id, c.color])), [calendars]);
+  const today = useMemo(() => buildToday(calendars, events, now), [calendars, events, now]);
+  const upNext = useMemo(() => {
+    const visible = new Set(calendars.filter((c) => c.visible).map((c) => c.id));
+    return nextUp(expandEvents(events, now - 86_400_000, now + 2 * 86_400_000).filter((o) => visible.has(o.event.calendarId)), now);
+  }, [calendars, events, now]);
 
   const toggle = async (t: Task) => {
     const done = t.completedAt == null;
@@ -74,21 +81,45 @@ export function Widget() {
     >
       <header className="w-head" data-tauri-drag-region={config.locked ? undefined : true} onDoubleClick={() => open(Date.now())}>
         <span className="w-title" data-tauri-drag-region={config.locked ? undefined : true}>
-          {week.title}
+          {config.layout === "today" ? capitalize(fmt(now, "EEEE d")) : week.title}
         </span>
         <span className="w-range" data-tauri-drag-region={config.locked ? undefined : true}>
-          {week.range}
+          {config.layout === "today" ? fmt(now, "MMMM") : week.range}
         </span>
         <span className="w-spacer" data-tauri-drag-region={config.locked ? undefined : true} />
-        {!config.locked && <span className="w-hint" data-tauri-drag-region>Arrastra para mover · bloquéalo en Ajustes</span>}
+        {upNext && (
+          <span
+            className={`w-next tint ${upNext.kind === "now" ? "is-now" : ""}`}
+            style={{ "--c": colorOf.get(upNext.occ.event.calendarId) } as CSSProperties}
+            title={upNext.occ.event.location || undefined}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              open(upNext.occ.start);
+            }}
+          >
+            <span className="w-next-kind">{upNext.kind === "now" ? "Ahora" : "Siguiente"}</span>
+            <span className="w-next-title">{upNext.occ.event.title}</span>
+            <span className="w-next-when">{upNext.label}</span>
+          </span>
+        )}
+        <button className="w-add" title="Añadir rápido" aria-label="Añadir rápido" onClick={() => void backend.openQuickAdd()}>
+          +
+        </button>
       </header>
 
       <div className="w-body">
-        <div className="w-week">
-          {week.days.map((d) => (
-            <DayColumn key={d.day} day={d} colorOf={colorOf} onOpen={open} />
-          ))}
-        </div>
+        {config.layout === "today" ? (
+          <div className="w-today">
+            <AgendaList title="Hoy" items={today.today} colorOf={colorOf} now={now} onOpen={open} empty="Nada más por hoy" />
+            <AgendaList title="Mañana" items={today.tomorrow} colorOf={colorOf} now={now} onOpen={open} empty="Mañana libre" />
+          </div>
+        ) : (
+          <div className="w-week">
+            {week.days.map((d) => (
+              <DayColumn key={d.day} day={d} colorOf={colorOf} onOpen={open} />
+            ))}
+          </div>
+        )}
 
         <aside className="w-tasks">
           <div className="w-tasks-head">
@@ -167,5 +198,35 @@ function Item({ occ, day, color, onOpen }: { occ: Occurrence; day: number; color
       {!filled && <span className="w-time">{occ.start < day ? "↳" : hm(occ.start)}</span>}
       <span className="w-item-title">{occ.event.title || "Nuevo evento"}</span>
     </div>
+  );
+}
+
+/** Lista de eventos de un día (modo "Hoy y mañana"): hora, barra de color, título y lugar. */
+function AgendaList(props: { title: string; items: Occurrence[]; colorOf: Map<string, string>; now: number; onOpen(day: number): void; empty: string }) {
+  const { items, now } = props;
+  return (
+    <section className="w-agenda">
+      <div className="w-agenda-head">{props.title}</div>
+      {items.length === 0 && <div className="w-empty">{props.empty}</div>}
+      {items.map((o) => {
+        const allDay = o.event.allDay || o.end - o.start >= 86_400_000;
+        const past = !allDay && o.end <= now;
+        return (
+          <div
+            key={o.key}
+            className={`w-agenda-row tint ${past ? "is-past" : ""} ${!allDay && o.start <= now && o.end > now ? "is-now" : ""}`}
+            style={{ "--c": props.colorOf.get(o.event.calendarId) } as CSSProperties}
+            onDoubleClick={() => props.onOpen(o.start)}
+          >
+            <span className="w-agenda-time">{allDay ? "todo el día" : `${hm(o.start)} – ${hm(o.end)}`}</span>
+            <span className="w-agenda-bar" />
+            <span className="w-agenda-main">
+              <span className="w-agenda-title">{o.event.title || "Nuevo evento"}</span>
+              {o.event.location && <span className="w-agenda-loc">{o.event.location}</span>}
+            </span>
+          </div>
+        );
+      })}
+    </section>
   );
 }

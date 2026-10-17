@@ -1,6 +1,6 @@
 [package]
 name = "agenda"
-version = "1.0.4"
+version = "1.0.5"
 description = "Agenda — calendario de escritorio con widget"
 authors = ["Nacho Garrido"]
 edition = "2021"

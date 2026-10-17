@@ -74,5 +74,7 @@ const wallpaperLight = (p) =>
   p.addStyleTag({ content: "html.widget{background:linear-gradient(135deg,#a8c0ff,#fbc2eb) !important} html.widget body{padding:20px}" });
 await shot("widget-claro", { path: "/widget.html?demo", width: 800, height: 420, act: wallpaperLight });
 await shot("widget-oscuro", { path: "/widget.html?demo", scheme: "dark", width: 800, height: 420, act: wallpaper });
+await shot("widget-hoy", { path: "/widget.html?demo&layout=today", width: 800, height: 420, act: wallpaperLight });
+await shot("widget-hoy-oscuro", { path: "/widget.html?demo&layout=today", scheme: "dark", width: 800, height: 420, act: wallpaper });
 await shot("widget-estrecho", { path: "/widget.html?demo", width: 520, height: 520, act: wallpaperLight });
 await browser.close();

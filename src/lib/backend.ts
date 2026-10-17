@@ -55,6 +55,8 @@ export interface Backend {
   openDataDir(): Promise<void>;
   /** Abre una página de Apple en el navegador. */
   openApplePage(url: string): Promise<void>;
+  /** Desde el widget: abre la app con "Añadir rápido". */
+  openQuickAdd(): Promise<void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -120,6 +122,7 @@ class TauriBackend implements Backend {
   appInfo() { return this.call<{ version: string; dataDir: string }>("app_info"); }
   openDataDir() { return this.call<void>("open_data_dir"); }
   openApplePage(url: string) { return this.call<void>("open_apple_page", { url }); }
+  openQuickAdd() { return this.call<void>("open_quick_add"); }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -315,6 +318,9 @@ export class MockBackend implements Backend {
   async onOpenIcs() { return () => {}; }
   async appInfo() { return { version: __APP_VERSION__, dataDir: "(navegador: localStorage)" }; }
   async openDataDir() {}
+  async openQuickAdd() {
+    this.channel?.postMessage("quickadd:");
+  }
   async openApplePage(url: string) {
     window.open(url, "_blank", "noopener");
   }
@@ -372,12 +378,21 @@ export class MockBackend implements Backend {
     this.channel?.addEventListener("message", l);
     return () => this.channel?.removeEventListener("message", l);
   }
-  async onQuickAdd() { return () => {}; }
+  async onQuickAdd(cb: () => void) {
+    const l = (e: MessageEvent) => e.data === "quickadd:" && cb();
+    this.channel?.addEventListener("message", l);
+    return () => this.channel?.removeEventListener("message", l);
+  }
 }
 
 function browserBackend(): Backend {
   // /?demo arranca con datos de ejemplo en memoria (no toca lo guardado en localStorage).
-  if (typeof location !== "undefined" && new URLSearchParams(location.search).has("demo")) return new MockBackend(demoData());
+  const params = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
+  if (params?.has("demo")) {
+    // ?demo&layout=today para ver el widget en modo "Hoy y mañana"
+    const layout = params.get("layout") === "today" ? "today" : "week";
+    return new MockBackend({ ...demoData(), settings: { widget: { ...DEFAULT_WIDGET, layout } } });
+  }
   return new MockBackend();
 }
 

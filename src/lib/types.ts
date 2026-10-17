@@ -76,6 +76,7 @@ export interface WidgetConfig {
   acrylic: boolean;
   opacity: number;
   theme: ThemePref;
+  layout: "week" | "today";
 }
 
 export interface MonitorInfo {
