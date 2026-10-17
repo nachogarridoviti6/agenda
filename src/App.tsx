@@ -14,6 +14,8 @@ import { QuickAdd } from "./components/QuickAdd";
 import { ScopeDialog } from "./components/ScopeDialog";
 import { Welcome } from "./components/Welcome";
 import { PendingIcsImport } from "./components/ImportExport";
+import { applyHolidays, HOLIDAYS_CALENDAR_ID } from "./components/HolidaysSection";
+import { backend } from "./lib/backend";
 import { startOfDayZ, weekDays } from "./lib/dates";
 
 export function App() {
@@ -33,6 +35,15 @@ export function App() {
   useAlarmScheduler();
   useCloudSync();
   useEffect(() => void useStore.getState().init(), []);
+  // Año nuevo: renovar los festivos (este año y el siguiente) si el calendario existe.
+  useEffect(() => {
+    if (!ready) return;
+    void backend.getSettings().then((s) => {
+      const year = new Date().getFullYear();
+      if (typeof s.holidaysYear === "number" && s.holidaysYear < year && useStore.getState().calendars.some((c) => c.id === HOLIDAYS_CALENDAR_ID))
+        void applyHolidays((s.holidayRegion as string | null) ?? null);
+    });
+  }, [ready]);
 
   if (!ready) return <div className="loading">{error ?? ""}</div>;
 

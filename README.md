@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.6_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.7_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -87,6 +87,11 @@ Escribe una frase y verás una vista previa antes de crearla:
 - Lista en la barra lateral agrupada como en Recordatorios: **Atrasadas**, **Hoy**, **Próximas**, **Sin fecha** (y **Hechas** con «Ver hechas»).
 - **Tareas que se repiten** (cada día, semana, mes…): al marcarlas como hechas queda una copia en «Hechas» y la tarea salta sola a su siguiente fecha. También con añadir rápido: `Pagar alquiler cada mes el 1 !!`.
 - **Posponer** a hoy, mañana o +1 semana desde el editor de la tarea (mantiene la hora).
+
+### Uni: horario y festivos
+
+- **Horario del cuatrimestre** (menu `+` → *Horario del cuatrimestre…*): escribe cada asignatura con sus días, horas y aula, y las fechas de inicio y fin. Se crea una clase semanal por asignatura hasta el final del cuatrimestre, con un aviso 10 minutos antes, y sin clase en los festivos.
+- **Festivos** (⚙️ Ajustes → Festivos): elige tu comunidad y se crea el calendario «Festivos» con los nacionales y autonómicos de este año y el siguiente (Semana Santa calculada). Se renuevan solos al cambiar de año. Los traslados a lunes y los festivos locales cambian cada año: añádelos a mano si hace falta.
 
 ### Repeticiones y alertas
 

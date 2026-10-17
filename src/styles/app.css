@@ -1491,3 +1491,60 @@ kbd {
 .task-group.is-overdue {
   color: var(--red);
 }
+
+/* Horario del cuatrimestre */
+.sem-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sem-head,
+.sem-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) 152px 136px minmax(70px, 0.7fr) 22px;
+  gap: 8px;
+  align-items: center;
+}
+.sem-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 0 2px;
+}
+.sem-row .text-input {
+  min-width: 0;
+  width: 100%;
+  height: 28px;
+  background: var(--bg-input);
+}
+.sem-row .time-input {
+  background: var(--bg-input);
+  color: var(--text);
+  width: 56px;
+}
+.sem-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-3);
+}
+.dow-picker.small button {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  background: var(--bg-input);
+}
+.dow-picker.small button.is-on {
+  background: var(--c, var(--accent));
+}
+.sem-add {
+  align-self: flex-start;
+  font-size: 12.5px;
+  color: var(--accent);
+  padding: 4px 2px;
+}
+.menu-sep {
+  height: 0.5px;
+  background: var(--line);
+  margin: 4px 6px;
+}

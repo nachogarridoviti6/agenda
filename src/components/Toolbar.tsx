@@ -4,6 +4,7 @@ import { capitalize, fmt, viewTitle } from "../lib/dates";
 import { ChevronLeft, ChevronRight, Plus, SidebarIcon } from "./icons";
 import type { ViewMode } from "../lib/types";
 import { SearchBox } from "./SearchBox";
+import { SemesterWizard } from "./SemesterWizard";
 
 const VIEWS: { id: ViewMode; label: string; key: string }[] = [
   { id: "day", label: "Día", key: "1" },
@@ -17,6 +18,7 @@ export function Toolbar() {
   const cursor = useStore((s) => s.cursor);
   const { setView, step, goToday, toggleSidebar, openNewEvent, openNewTask, openQuickAdd } = useStore.getState();
   const [menu, setMenu] = useState(false);
+  const [semester, setSemester] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +58,8 @@ export function Toolbar() {
                 Nuevo evento <kbd>N</kbd>
               </button>
               <button onClick={() => { setMenu(false); openNewTask(); }}>Nueva tarea</button>
+              <div className="menu-sep" />
+              <button onClick={() => { setMenu(false); setSemester(true); }}>Horario del cuatrimestre…</button>
             </div>
           )}
         </div>
@@ -93,6 +97,7 @@ export function Toolbar() {
           </button>
         </div>
       </div>
+      {semester && <SemesterWizard onClose={() => setSemester(false)} />}
     </header>
   );
 }

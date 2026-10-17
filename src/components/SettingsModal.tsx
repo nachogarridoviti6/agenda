@@ -6,6 +6,7 @@ import { Modal } from "./Modal";
 import { Row, Switch } from "./fields";
 import { ImportExportSection } from "./ImportExport";
 import { ICloudSection } from "./ICloudSection";
+import { HolidaysSection } from "./HolidaysSection";
 
 const THEMES: { value: ThemePref; label: string }[] = [
   { value: "system", label: "Automático" },
@@ -169,6 +170,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
             : "Arrastra la cabecera del widget para moverlo y sus bordes para cambiar el tamaño."}
           {!isTauri() && " (En el navegador el widget se abre en /widget.html.)"}
         </p>
+
+        <div className="f-section">Festivos</div>
+        <HolidaysSection />
 
         <div className="f-section">iCloud</div>
         <ICloudSection />

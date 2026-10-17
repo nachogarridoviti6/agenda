@@ -64,6 +64,20 @@ await shot("icloud-asistente", {
   },
 });
 await shot("tarea-repetida", { act: async (p) => { await p.locator(".task-row", { hasText: "Pagar alquiler" }).click(); await p.getByLabel("Repetir").selectOption("monthly"); } });
+await shot("horario-cuatrimestre", {
+  act: async (p) => {
+    await p.getByRole("button", { name: "Añadir", exact: true }).click();
+    await p.getByRole("button", { name: "Horario del cuatrimestre…" }).click();
+    const d = p.getByRole("dialog");
+    await d.getByLabel("Asignatura 1", { exact: true }).fill("Cálculo II");
+    await d.getByRole("button", { name: "L asignatura 1", exact: true }).click();
+    await d.getByRole("button", { name: "X asignatura 1", exact: true }).click();
+    await d.getByLabel("Aula asignatura 1", { exact: true }).fill("Aula 1.2");
+    await d.getByLabel("Asignatura 2", { exact: true }).fill("Sistemas de fabricación");
+    await d.getByRole("button", { name: "M asignatura 2", exact: true }).click();
+    await d.getByRole("button", { name: "J asignatura 2", exact: true }).click();
+  },
+});
 await shot("bienvenida", { path: "/?demo&welcome" });
 await shot("acerca-de", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.locator(".f-section", { hasText: "Acerca de" }).scrollIntoViewIfNeeded(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });
