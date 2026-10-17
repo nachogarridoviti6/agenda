@@ -4,6 +4,7 @@ import type { CalEvent, Calendar, Occurrence, Task, ThemePref, ViewMode } from "
 import { addDaysZ, startOfDayZ, stepCursor, viewRange } from "./lib/dates";
 import { DEFAULT_EVENT_MINUTES } from "./lib/defaults";
 import { deleteOccurrence, editOccurrence, shiftWeekday, type Scope, type SeriesOps } from "./lib/series";
+import { completeTask } from "./lib/tasks";
 
 export type Editor =
   /** `master` y `occStart` solo cuando se edita una repetición de una serie. */
@@ -329,11 +330,17 @@ export const useStore = create<State>((set, get) => ({
     }
   },
   async toggleTask(t) {
-    const updated = { ...t, completedAt: t.completedAt ? null : Date.now(), updatedAt: Date.now() };
+    const now = Date.now();
+    // Completar una tarea que se repite crea una copia hecha y la mueve a la siguiente fecha.
+    const changes = t.completedAt ? [{ ...t, completedAt: null, updatedAt: now }] : completeTask(t, now, newId);
     // Optimista: el check responde al instante.
-    set((s) => ({ tasks: s.tasks.map((x) => (x.id === t.id ? updated : x)) }));
+    set((s) => {
+      const byId = new Map(s.tasks.map((x) => [x.id, x]));
+      for (const c of changes) byId.set(c.id, c);
+      return { tasks: [...byId.values()] };
+    });
     try {
-      await backend.saveTask(updated);
+      for (const c of changes) await backend.saveTask(c);
     } catch (err) {
       fail(set, err);
       await get().reload("tasks");

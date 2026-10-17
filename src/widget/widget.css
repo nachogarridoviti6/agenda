@@ -370,3 +370,8 @@ html.widget body {
   color: var(--text-2);
   padding: 4px;
 }
+
+.w-repeat {
+  color: var(--text-2);
+  font-size: 10.5px;
+}

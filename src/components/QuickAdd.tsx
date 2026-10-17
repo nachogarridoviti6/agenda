@@ -41,7 +41,7 @@ export function QuickAdd() {
     const now = Date.now();
     if (parsed.kind === "task")
       return {
-        task: { id: newId(), calendarId: cal.id, title: parsed.title, notes: "", due: parsed.due, dueHasTime: parsed.dueHasTime, priority: parsed.priority, completedAt: null, createdAt: now, updatedAt: now },
+        task: { id: newId(), calendarId: cal.id, title: parsed.title, notes: "", due: parsed.due, dueHasTime: parsed.dueHasTime, priority: parsed.priority, completedAt: null, createdAt: now, updatedAt: now, rrule: parsed.rrule },
       };
     return {
       event: {
@@ -104,7 +104,7 @@ export function QuickAdd() {
             </div>
             <div className="quick-meta">
               <span>🗓 {whenText(parsed)}</span>
-              {rule && parsed.start != null && <span>🔁 {describeRule(rule, parsed.start)}</span>}
+              {rule && (parsed.start ?? parsed.due) != null && <span>🔁 {describeRule(rule, (parsed.start ?? parsed.due)!)}</span>}
               {parsed.location && <span>📍 {parsed.location}</span>}
               <span><span className="dot" /> {cal?.name}{!parsed.calendarId && " (por defecto)"}</span>
             </div>

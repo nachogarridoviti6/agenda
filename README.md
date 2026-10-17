@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.5_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.6_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -81,6 +81,12 @@ Escribe una frase y verás una vista previa antes de crearla:
 - Horas: 10:00, 10h, 9am, a las 9, 10-13, de 10 a 13, durante 90 min, todo el día.
 - Repetición: cada día, cada día laborable, cada lunes y miércoles, todos los martes, cada 2 semanas, cada mes, hasta el 20/12.
 - Es tarea si empieza por «Entrega», «Pagar», «Llamar», «Enviar», «Comprar»…, si lleva `!` o si vence a las 23:59. Para forzar el tipo, empieza con `tarea:` o `evento:`, o usa el selector Evento/Tarea de la vista previa.
+
+### Tareas
+
+- Lista en la barra lateral agrupada como en Recordatorios: **Atrasadas**, **Hoy**, **Próximas**, **Sin fecha** (y **Hechas** con «Ver hechas»).
+- **Tareas que se repiten** (cada día, semana, mes…): al marcarlas como hechas queda una copia en «Hechas» y la tarea salta sola a su siguiente fecha. También con añadir rápido: `Pagar alquiler cada mes el 1 !!`.
+- **Posponer** a hoy, mañana o +1 semana desde el editor de la tarea (mantiene la hora).
 
 ### Repeticiones y alertas
 

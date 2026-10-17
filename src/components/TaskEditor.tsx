@@ -4,6 +4,9 @@ import type { Priority, Task } from "../lib/types";
 import { combine, dayKey, startOfDayZ, timeKey } from "../lib/dates";
 import { Modal } from "./Modal";
 import { DateInput, TimeInput } from "./DateTimeInputs";
+import { RepeatEditor } from "./RepeatEditor";
+import { formatRRule, parseRRule, type Rule } from "../lib/rrule";
+import { snooze } from "../lib/tasks";
 import { CalendarSelect, DeleteButton, Row, Switch } from "./fields";
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -28,6 +31,7 @@ export function TaskEditor({ task, isNew }: { task: Task; isNew: boolean }) {
   const [notes, setNotes] = useState(task.notes);
   const [done, setDone] = useState(task.completedAt != null);
   const [armed, setArmed] = useState(false);
+  const [rule, setRule] = useState<Rule | null>(parseRRule(task.rrule));
 
   const due = hasDate ? (hasTime ? combine(day, time) : startOfDayZ(combine(day, "12:00"))) : null;
   const invalid = !title.trim() || (due != null && Number.isNaN(due));
@@ -43,6 +47,7 @@ export function TaskEditor({ task, isNew }: { task: Task; isNew: boolean }) {
       priority,
       notes,
       completedAt: done ? (task.completedAt ?? Date.now()) : null,
+      rrule: hasDate && rule ? formatRRule(rule, !(hasDate && hasTime)) : null,
     });
   };
 
@@ -59,11 +64,30 @@ export function TaskEditor({ task, isNew }: { task: Task; isNew: boolean }) {
             {hasDate && <DateInput label="Fecha" value={day} onChange={(v) => setDay(v)} />}
           </Row>
           {hasDate && (
+            <Row label="Posponer a">
+              <div className="segmented small">
+                {([["today", "Hoy"], ["tomorrow", "Mañana"], ["nextWeek", "+1 semana"]] as const).map(([k, label]) => (
+                  <button
+                    type="button"
+                    key={k}
+                    onClick={() => {
+                      const s2 = snooze({ ...task, due: due ?? Date.now(), dueHasTime: hasTime }, k, Date.now());
+                      setDay(dayKey(s2.due!));
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Row>
+          )}
+          {hasDate && (
             <Row label="Hora">
               <Switch checked={hasTime} onChange={setHasTime} label="Hora" />
               {hasTime && <TimeInput label="Hora" value={time} onChange={(v) => setTime(v)} />}
             </Row>
           )}
+          {hasDate && due != null && !Number.isNaN(due) && <RepeatEditor rule={rule} start={due} onChange={setRule} />}
           <Row label="Prioridad">
             <div className="segmented small">
               {PRIORITIES.map((p) => (

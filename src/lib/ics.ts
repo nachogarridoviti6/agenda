@@ -261,6 +261,7 @@ export function exportIcs(opts: ExportOptions): string {
     if (t.notes) L.push(`DESCRIPTION:${escapeText(t.notes)}`);
     if (t.due != null) L.push(dtProp("DUE", t.due, !t.dueHasTime));
     if (t.priority) L.push(`PRIORITY:${({ 3: 1, 2: 5, 1: 9 } as Record<number, number>)[t.priority]}`);
+    if (t.rrule && t.due != null) L.push(`RRULE:${t.rrule}`);
     if (t.completedAt != null) L.push("STATUS:COMPLETED", `COMPLETED:${utcStamp(t.completedAt)}`);
     else L.push("STATUS:NEEDS-ACTION");
     const cal = calName.get(t.calendarId);
@@ -422,6 +423,7 @@ export function importIcs(text: string, now = Date.now()): ImportResult {
       completedAt: status === "COMPLETED" || completed ? (completed?.ms ?? now) : null,
       createdAt: now,
       updatedAt: now,
+      rrule: due && get(c, "RRULE") ? cleanRule(get(c, "RRULE")!.value, due.ms) : null,
     };
     const src = get(c, "X-AGENDA-CALENDAR");
     if (src) sourceCalendar.set(t.id, unescapeText(src.value));

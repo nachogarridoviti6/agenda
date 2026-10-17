@@ -79,6 +79,9 @@ CREATE TABLE sync_items (
     synced_version  INTEGER NOT NULL,
     readonly        INTEGER NOT NULL DEFAULT 0
 );
+"#, r#"
+-- Tareas que se repiten (RRULE, como los eventos)
+ALTER TABLE tasks ADD COLUMN rrule TEXT;
 "#];
 
 pub struct Db {
@@ -383,7 +386,7 @@ impl Db {
             .conn
             .prepare(
                 "SELECT id, calendar_id, title, notes, due_ts, due_has_time, priority, completed_at,
-                        created_at, updated_at
+                        created_at, updated_at, rrule
                  FROM tasks ORDER BY due_ts IS NULL, due_ts, priority DESC, created_at",
             )
             .map_err(err)?;
@@ -400,6 +403,7 @@ impl Db {
                     completed_at: r.get(7)?,
                     created_at: r.get(8)?,
                     updated_at: r.get(9)?,
+                    rrule: r.get(10)?,
                 })
             })
             .map_err(err)?;
@@ -410,13 +414,13 @@ impl Db {
         self.conn
             .execute(
                 "INSERT INTO tasks (id, calendar_id, title, notes, due_ts, due_has_time, priority,
-                    completed_at, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                    completed_at, created_at, updated_at, rrule)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                  ON CONFLICT(id) DO UPDATE SET calendar_id = ?2, title = ?3, notes = ?4, due_ts = ?5,
-                    due_has_time = ?6, priority = ?7, completed_at = ?8, updated_at = ?10",
+                    due_has_time = ?6, priority = ?7, completed_at = ?8, updated_at = ?10, rrule = ?11",
                 params![
                     t.id, t.calendar_id, t.title, t.notes, t.due, t.due_has_time, t.priority,
-                    t.completed_at, t.created_at, t.updated_at
+                    t.completed_at, t.created_at, t.updated_at, t.rrule
                 ],
             )
             .map_err(err)?;
@@ -611,6 +615,7 @@ mod tests {
             completed_at: None,
             created_at: 0,
             updated_at: 0,
+            rrule: Some("FREQ=MONTHLY".into()),
         };
         db.save_task(&t).unwrap();
         assert_eq!(db.list_tasks().unwrap(), vec![t]);

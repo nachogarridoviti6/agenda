@@ -48,7 +48,9 @@ describe("ida y vuelta (exportar → importar)", () => {
     expect(m.notes).toBe(master.notes);
     expect(back.events.find((e) => e.id === "a1")!.alerts).toEqual([1440]);
     expect(back.sourceCalendar.get("a1")).toBe("Trabajo");
-    expect(back.tasks).toEqual([{ ...task, calendarId: "", createdAt: now, updatedAt: now }]);
+    expect(back.tasks).toEqual([{ ...task, calendarId: "", createdAt: now, updatedAt: now, rrule: null }]);
+    const recurring = importIcs(exportIcs({ events: [], tasks: [{ ...task, rrule: "FREQ=WEEKLY" }], calendars: DEFAULT_CALENDARS, now }), now);
+    expect(recurring.tasks[0].rrule).toBe("FREQ=WEEKLY");
   });
 });
 

@@ -63,6 +63,7 @@ await shot("icloud-asistente", {
     await p.locator(".wizard").scrollIntoViewIfNeeded();
   },
 });
+await shot("tarea-repetida", { act: async (p) => { await p.locator(".task-row", { hasText: "Pagar alquiler" }).click(); await p.getByLabel("Repetir").selectOption("monthly"); } });
 await shot("bienvenida", { path: "/?demo&welcome" });
 await shot("acerca-de", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.locator(".f-section", { hasText: "Acerca de" }).scrollIntoViewIfNeeded(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });

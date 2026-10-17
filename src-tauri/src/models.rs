@@ -44,6 +44,9 @@ pub struct Task {
     pub completed_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Repetición (RRULE) o None.
+    #[serde(default)]
+    pub rrule: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

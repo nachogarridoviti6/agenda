@@ -51,6 +51,8 @@ export interface Task {
   completedAt: number | null;
   createdAt: number;
   updatedAt: number;
+  /** Repetición (RRULE). Al completarla se guarda una copia hecha y la tarea salta a la siguiente fecha. */
+  rrule?: string | null;
 }
 
 /** Una aparición concreta de un evento en el calendario (las series se expanden). */

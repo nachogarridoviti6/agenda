@@ -4,9 +4,24 @@ import { useCalendarMap } from "../hooks";
 import { MiniMonth } from "./MiniMonth";
 import { Cloud, Gear, Pencil, Plus } from "./icons";
 import { useCloud } from "../cloud";
-import { fmt } from "../lib/dates";
+import { dayDiff, fmt } from "../lib/dates";
+import type { Task } from "../lib/types";
 import { compareTasks } from "../lib/occurrences";
 import { isOverdue, priorityMarks, taskDueLabel } from "../lib/format";
+
+/** Atrasadas · Hoy · Próximas · Sin fecha · Hechas (como en Recordatorios). */
+function groupTasks(list: Task[]): [string, Task[]][] {
+  const now = Date.now();
+  const groups: Record<string, Task[]> = { Atrasadas: [], Hoy: [], Próximas: [], "Sin fecha": [], Hechas: [] };
+  for (const t of list) {
+    if (t.completedAt != null) groups.Hechas.push(t);
+    else if (t.due == null) groups["Sin fecha"].push(t);
+    else if (isOverdue(t, now)) groups.Atrasadas.push(t);
+    else if (dayDiff(t.due, now) === 0) groups.Hoy.push(t);
+    else groups.Próximas.push(t);
+  }
+  return Object.entries(groups).filter(([, v]) => v.length > 0);
+}
 
 export function Sidebar({ onSettings }: { onSettings(): void }) {
   const calendars = useStore((s) => s.calendars);
@@ -65,7 +80,10 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
         </div>
         <div className="task-list">
           {list.length === 0 && <div className="empty">Nada pendiente 🎉</div>}
-          {list.map((t) => (
+          {groupTasks(list).map(([label, items]) => (
+            <div key={label}>
+              <div className={`task-group ${label === "Atrasadas" ? "is-overdue" : ""}`}>{label}</div>
+              {items.map((t) => (
             <div key={t.id} className="task-row" style={{ "--c": calMap.get(t.calendarId)?.color } as CSSProperties} onClick={() => openTask(t)}>
               <input
                 type="checkbox"
@@ -80,8 +98,15 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
                   {t.priority > 0 && <span className="prio">{priorityMarks(t.priority)} </span>}
                   {t.title}
                 </div>
-                {t.due != null && <div className={`task-due ${isOverdue(t) ? "is-overdue" : ""}`}>{taskDueLabel(t)}</div>}
+                {t.due != null && (
+                  <div className={`task-due ${isOverdue(t) ? "is-overdue" : ""}`}>
+                    {taskDueLabel(t)}
+                    {t.rrule && <span title="Se repite"> · ↻</span>}
+                  </div>
+                )}
               </div>
+            </div>
+              ))}
             </div>
           ))}
         </div>

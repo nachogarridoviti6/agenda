@@ -109,6 +109,19 @@ describe("tareas, prioridad, lugar y calendario", () => {
   });
 });
 
+describe("tareas que se repiten", () => {
+  it("Pagar alquiler cada mes el 1 !! → tarea mensual", () => {
+    const r = p("Pagar alquiler cada mes el 1 !!");
+    expect(r).toMatchObject({ kind: "task", title: "Pagar alquiler", priority: 2, rrule: "FREQ=MONTHLY" });
+    expect(dayKey(r.due!)).toBe("2026-11-01");
+  });
+  it("Entregar informe cada viernes 14:00 → tarea semanal con hora", () => {
+    const r = p("Entregar informe cada viernes 14:00 #trabajo");
+    expect(r).toMatchObject({ kind: "task", rrule: "FREQ=WEEKLY;BYDAY=FR", dueHasTime: true });
+    expect(at(r.due)).toBe("2026-10-16 14:00");
+  });
+});
+
 describe("repeticiones", () => {
   it("cada lunes y miércoles", () => {
     const r = p("Cálculo cada lunes y miércoles 9-11 #uni");

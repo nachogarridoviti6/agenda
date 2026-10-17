@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { backend } from "../lib/backend";
+import { backend, newId } from "../lib/backend";
+import { completeTask } from "../lib/tasks";
 import { DEFAULT_WIDGET } from "../lib/defaults";
 import { addDaysZ, capitalize, fmt, hm, startOfWeekZ } from "../lib/dates";
 import { buildToday, buildWidgetWeek, nextUp, shortDue, type WidgetDay } from "../lib/widget";
@@ -59,8 +60,11 @@ export function Widget() {
 
   const toggle = async (t: Task) => {
     const done = t.completedAt == null;
-    const updated = { ...t, completedAt: done ? Date.now() : null, updatedAt: Date.now() };
-    setTasks((ts) => ts.map((x) => (x.id === t.id ? updated : x)));
+    const now = Date.now();
+    const changes = done ? completeTask(t, now, newId) : [{ ...t, completedAt: null, updatedAt: now }];
+    // En el widget la tarea se ve tachada un momento (aunque se repita y salte a la siguiente fecha).
+    const shown = { ...t, completedAt: done ? now : null };
+    setTasks((ts) => [...ts.filter((x) => !changes.some((c) => c.id === x.id) && x.id !== t.id), shown, ...changes.filter((c) => c.id !== t.id && c.completedAt == null)]);
     if (done) {
       setKeep((k) => new Set(k).add(t.id));
       setTimeout(() => setKeep((k) => {
@@ -69,7 +73,7 @@ export function Widget() {
         return n;
       }), KEEP_DONE_MS);
     }
-    await backend.saveTask(updated);
+    for (const c of changes) await backend.saveTask(c);
   };
 
   const open = (day?: number) => void backend.openMain(day);
@@ -131,7 +135,10 @@ export function Widget() {
               <label key={t.id} className="w-task" style={{ "--c": colorOf.get(t.calendarId) } as CSSProperties} onDoubleClick={() => open(t.due ?? undefined)}>
                 <input type="checkbox" className="check" checked={t.completedAt != null} onChange={() => void toggle(t)} />
                 <span className="w-task-main">
-                  <span className={`w-task-title ${t.completedAt ? "done" : ""}`}>{t.title}</span>
+                  <span className={`w-task-title ${t.completedAt ? "done" : ""}`}>
+                    {t.title}
+                    {t.rrule && <span className="w-repeat" title="Se repite"> ↻</span>}
+                  </span>
                   <span className={`w-task-due ${isOverdue(t, now) ? "is-overdue" : ""}`}>{shortDue(t, now)}</span>
                 </span>
               </label>

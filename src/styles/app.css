@@ -1479,3 +1479,15 @@ kbd {
   font-size: 12.5px;
   line-height: 1.45;
 }
+
+.task-group {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 8px 2px;
+}
+.task-group.is-overdue {
+  color: var(--red);
+}

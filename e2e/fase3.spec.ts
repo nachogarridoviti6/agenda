@@ -101,3 +101,18 @@ test("vistas día, semana, mes y año con 1-4", async ({ page }) => {
   await expect(page.locator(".tg-dayhead.is-today")).toHaveCount(1);
   await expect(page.locator(".tg-dayhead")).toHaveCount(1);
 });
+
+test("tarea que se repite: al completarla salta a la siguiente fecha y queda en el historial", async ({ page }) => {
+  await quickAdd(page, "Pagar alquiler cada mes el 1 !!");
+  const row = page.locator(".task-row", { hasText: "Pagar alquiler" });
+  await expect(row).toContainText("↻");
+  const before = await row.locator(".task-due").textContent();
+  await row.getByRole("checkbox").click();
+  // Sigue pendiente, pero con la fecha del mes siguiente
+  await expect(page.locator(".task-row", { hasText: "Pagar alquiler" })).toHaveCount(1);
+  await expect(page.locator(".task-row", { hasText: "Pagar alquiler" }).locator(".task-due")).not.toHaveText(before!);
+  // La copia completada aparece en "Ver hechas"
+  await page.getByRole("button", { name: "Ver hechas" }).click();
+  await expect(page.locator(".task-row", { hasText: "Pagar alquiler" })).toHaveCount(2);
+  await expect(page.locator(".task-group", { hasText: "Hechas" })).toBeVisible();
+});

@@ -27,6 +27,7 @@ export interface QuickResult {
   /** Tarea */
   due: number | null;
   dueHasTime: boolean;
+  /** Repetición (eventos y tareas) */
 }
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -337,8 +338,7 @@ export function parseQuickAdd(input: string, calendars: Calendar[], now = Date.n
     (forced !== "event" &&
       end == null &&
       !allDay &&
-      rule == null &&
-      (priority > 0 || TASK_WORDS.has(firstWord) || (start?.h === 23 && start?.m === 59)));
+      (priority > 0 || TASK_WORDS.has(firstWord) || (rule == null && start?.h === 23 && start?.m === 59)));
 
   // Un día de la semana suelto que es hoy y cuya hora ya ha pasado → la semana que viene.
   if (weekdayRelative && date === today && start && atMinutes(today, start.h * 60 + start.m) < now && !rule) date = addDaysZ(today, 7);
@@ -357,12 +357,22 @@ export function parseQuickAdd(input: string, calendars: Calendar[], now = Date.n
     dueHasTime: false,
   };
 
+  const ruleFound = rule as Partial<Rule> | null;
+  const makeRule = (allDayRule: boolean) =>
+    ruleFound
+      ? formatRRule(
+          { freq: ruleFound.freq!, interval: ruleFound.interval ?? 1, byDay: ruleFound.byDay ?? [], byMonthDay: [], until: untilDay != null ? endOfDayZ(untilDay) : null, count: null },
+          allDayRule,
+        )
+      : null;
+
   if (isTask) {
-    if (date != null || start) {
+    if (date != null || start || ruleFound) {
       const d = date ?? today;
       base.due = start ? atMinutes(d, start.h * 60 + start.m) : d;
       base.dueHasTime = !!start;
     }
+    base.rrule = makeRule(!start);
     return base;
   }
 
@@ -381,12 +391,7 @@ export function parseQuickAdd(input: string, calendars: Calendar[], now = Date.n
     base.start = s;
     base.end = e;
   }
-  // (las funciones de arriba asignan `rule`; TypeScript no lo ve)
-  const found = rule as Partial<Rule> | null;
-  if (found) {
-    const full: Rule = { freq: found.freq!, interval: found.interval ?? 1, byDay: found.byDay ?? [], byMonthDay: [], until: untilDay != null ? endOfDayZ(untilDay) : null, count: null };
-    base.rrule = formatRRule(full, base.allDay);
-  }
+  base.rrule = makeRule(base.allDay);
   return base;
 }
 
