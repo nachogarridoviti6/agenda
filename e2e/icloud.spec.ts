@@ -23,6 +23,13 @@ test("conectar iCloud (simulado), enlazar calendarios y sincronizar", async ({ p
   await expect(dialog(page)).toContainText("nacho@icloud.com");
   await expect(dialog(page).getByLabel("Sincronizar Trabajo con")).toHaveValue("cal-trabajo");
   await expect(dialog(page).getByLabel("Sincronizar Casa con")).toHaveValue("");
+  await expect(dialog(page)).not.toContainText("No hay ningún calendario enlazado");
+
+  // Desenlazar Trabajo → aviso de que no se sincroniza nada
+  await dialog(page).getByLabel("Sincronizar Trabajo con").selectOption("");
+  await expect(dialog(page)).toContainText("No hay ningún calendario enlazado");
+  await expect(page.locator(".sync-status")).toContainText("sin calendarios enlazados");
+  await dialog(page).getByLabel("Sincronizar Trabajo con").selectOption("cal-trabajo");
 
   // Enlazar "Casa" creando un calendario nuevo → baja el evento del iPhone
   await dialog(page).getByLabel("Sincronizar Casa con").selectOption("new");
@@ -37,7 +44,10 @@ test("conectar iCloud (simulado), enlazar calendarios y sincronizar", async ({ p
 
   await page.keyboard.press("3");
   await expect(page.locator(".mitem", { hasText: "Dentista (desde el iPhone)" }).first()).toBeVisible();
-  await expect(page.locator(".sync-status")).toContainText("iCloud ·");
+  await expect(page.locator(".sync-status")).toContainText(/iCloud · \d/);
+  await page.getByRole("button", { name: "Ajustes" }).click();
+  await expect(dialog(page)).toContainText(/Última vez:|Todo al día/);
+  await page.getByRole("button", { name: "Listo" }).click();
 
   // Desconectar deja los eventos
   await page.getByRole("button", { name: "Ajustes" }).click();

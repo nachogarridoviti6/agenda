@@ -98,7 +98,15 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
             title={error ?? "Sincronizar con iCloud ahora"}
           >
             <Cloud width={13} height={13} />
-            {syncing ? "Sincronizando…" : error ? "Error al sincronizar" : lastSync ? `iCloud · ${fmt(lastSync, "H:mm")}` : "iCloud"}
+            {syncing
+              ? "Sincronizando…"
+              : error
+                ? "Error al sincronizar"
+                : linkedIds.size === 0
+                  ? "iCloud · sin calendarios enlazados"
+                  : lastSync
+                    ? `iCloud · ${fmt(lastSync, "H:mm")}`
+                    : "iCloud"}
           </button>
         )}
       </div>

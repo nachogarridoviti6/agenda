@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useStore } from "../store";
 import { useCloud, transport } from "../cloud";
 import { backend, newId } from "../lib/backend";
-import type { RemoteCalendar, SyncLink } from "../lib/sync";
+import type { RemoteCalendar, SyncLink, SyncReport } from "../lib/sync";
 import { fmt } from "../lib/dates";
 import { Row } from "./fields";
 import { APPLE_APP_PASSWORDS_URL, checkAppPassword, formatAppPassword } from "../lib/applepw";
@@ -15,6 +15,16 @@ function ago(ms: number | null): string {
   if (m < 1) return "ahora mismo";
   if (m < 60) return `hace ${m} min`;
   return `a las ${fmt(ms, "H:mm")}`;
+}
+
+/** "3 eventos recibidos · 1 enviado" o "Todo al día". */
+export function reportSummary(r: SyncReport): string {
+  const parts: string[] = [];
+  const n = (k: number, one: string, many: string) => k > 0 && parts.push(`${k} ${k === 1 ? one : many}`);
+  n(r.pulled, "evento recibido de iCloud", "eventos recibidos de iCloud");
+  n(r.pushed, "enviado", "enviados");
+  n(r.deletedLocal + r.deletedRemote, "borrado", "borrados");
+  return parts.length ? `Última vez: ${parts.join(" · ")}.` : "Todo al día: no había cambios en ningún lado.";
 }
 
 /** Ajustes → iCloud: conectar la cuenta y elegir qué calendarios se sincronizan con cuál. */
@@ -208,6 +218,13 @@ export function ICloudSection() {
         </Row>
       </div>
       {error && <p className="f-error">{error}</p>}
+      {lastReport && !syncing && !error && <p className="f-help">{reportSummary(lastReport)}</p>}
+      {remote != null && links.length === 0 && (
+        <div className="notice">
+          ⚠️ <b>No hay ningún calendario enlazado</b>, así que no se sincroniza nada. Elige abajo con qué calendario de Agenda va cada uno de iCloud
+          (o «Crear calendario…» para traerlo tal cual).
+        </div>
+      )}
       {lastReport && (lastReport.conflicts.length > 0 || lastReport.skippedReadonly.length > 0 || lastReport.unlinked.length > 0) && (
         <div className="f-help">
           {lastReport.conflicts.map((c) => <div key={c}>⚠️ {c}</div>)}
