@@ -34,7 +34,7 @@ await shot("anadir-rapido", { act: async (p) => { await p.keyboard.press("Contro
 await shot("anadir-rapido-tarea-oscuro", { scheme: "dark", act: async (p) => { await p.keyboard.press("Control+k"); await p.keyboard.type("Entrega práctica fabricación viernes 23:59 #uni"); } });
 await shot("busqueda", { act: async (p) => { await p.keyboard.press("Control+f"); await p.keyboard.type("calculo"); } });
 await shot("repeticion", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); } });
-await shot("solo-este-o-futuros", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); await p.getByPlaceholder("Título").fill("Cálculo II (examen)"); await p.getByRole("dialog").getByRole("button", { name: "Guardar" }).click(); } });
+await shot("solo-este-o-futuros", { act: async (p) => { await p.locator(".ev", { hasText: "Cálculo II" }).first().click(); await p.getByPlaceholder("Título").fill("Cálculo II (examen)"); await p.getByRole("dialog").getByRole("button", { name: "Guardar", exact: true }).click(); } });
 await shot("exportar", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.getByRole("button", { name: "Exportar .ics…" }).click(); } });
 await shot("icloud", {
   path: "/",
@@ -78,6 +78,7 @@ await shot("horario-cuatrimestre", {
     await d.getByRole("button", { name: "J asignatura 2", exact: true }).click();
   },
 });
+await shot("editor-con-plantilla", { act: (p) => p.locator(".ev", { hasText: "Grabación villa" }).first().click() });
 await shot("bienvenida", { path: "/?demo&welcome" });
 await shot("acerca-de", { act: async (p) => { await p.getByRole("button", { name: "Ajustes" }).click(); await p.locator(".f-section", { hasText: "Acerca de" }).scrollIntoViewIfNeeded(); } });
 await shot("ajustes", { act: (p) => p.getByRole("button", { name: "Ajustes" }).click() });

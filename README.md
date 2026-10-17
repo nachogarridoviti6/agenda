@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.7_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.8_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -92,6 +92,11 @@ Escribe una frase y verás una vista previa antes de crearla:
 
 - **Horario del cuatrimestre** (menu `+` → *Horario del cuatrimestre…*): escribe cada asignatura con sus días, horas y aula, y las fechas de inicio y fin. Se crea una clase semanal por asignatura hasta el final del cuatrimestre, con un aviso 10 minutos antes, y sin clase en los festivos.
 - **Festivos** (⚙️ Ajustes → Festivos): elige tu comunidad y se crea el calendario «Festivos» con los nacionales y autonómicos de este año y el siguiente (Semana Santa calculada). Se renuevan solos al cambiar de año. Los traslados a lunes y los festivos locales cambian cada año: añádelos a mano si hace falta.
+
+### Trabajo: plantillas y duplicar
+
+- En cualquier evento, **Guardar como plantilla** guarda todo menos la fecha: calendario, duración, lugar, notas (p. ej. el material de una grabación) y alertas. Después aparece en el menú `+` → *Plantillas*. Se gestionan en ⚙️ Ajustes → Plantillas de evento.
+- **Duplicar** (o `Ctrl+D` en el editor) abre una copia del evento para cambiarle la fecha antes de guardarla.
 
 ### Repeticiones y alertas
 

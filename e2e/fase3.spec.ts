@@ -34,7 +34,7 @@ test("evento semanal: crear, cambiar solo uno, cambiar los futuros y borrar", as
   // Solo este: renombrar la primera repetición
   await page.locator(".ev", { hasText: "Clase de inglés" }).first().click();
   await page.getByPlaceholder("Título").fill("Inglés (examen oral)");
-  await dialog(page).getByRole("button", { name: "Guardar" }).click();
+  await dialog(page).getByRole("button", { name: "Guardar", exact: true }).click();
   await page.getByRole("button", { name: "Solo este evento" }).click();
   await expect(page.locator(".ev", { hasText: "Inglés (examen oral)" })).toHaveCount(1);
   await expect(page.locator(".ev", { hasText: "Clase de inglés" })).toHaveCount(inWeek - 1);
@@ -52,7 +52,7 @@ test("evento semanal: crear, cambiar solo uno, cambiar los futuros y borrar", as
 test("Esc en el diálogo de alcance solo cierra ese diálogo", async ({ page }) => {
   await quickAdd(page, "Meditar cada día 8:00");
   await page.locator(".ev", { hasText: "Meditar" }).first().click();
-  await dialog(page).getByRole("button", { name: "Guardar" }).click();
+  await dialog(page).getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.getByRole("button", { name: "Solo este evento" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Solo este evento" })).toHaveCount(0);

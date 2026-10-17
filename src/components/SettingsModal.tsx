@@ -171,6 +171,9 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
           {!isTauri() && " (En el navegador el widget se abre en /widget.html.)"}
         </p>
 
+        <div className="f-section">Plantillas de evento</div>
+        <TemplatesList />
+
         <div className="f-section">Festivos</div>
         <HolidaysSection />
 
@@ -198,5 +201,22 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+function TemplatesList() {
+  const templates = useStore((s) => s.templates);
+  const saveTemplates = useStore((s) => s.saveTemplates);
+  if (!templates.length)
+    return <p className="f-help">Aún no hay plantillas. Abre un evento (p. ej. una grabación) y pulsa «Guardar como plantilla»; luego lo tendrás en el menú +.</p>;
+  return (
+    <div className="f-group">
+      {templates.map((t) => (
+        <Row key={t.id} label={t.name}>
+          <span className="f-muted f-small">{t.allDay ? "Todo el día" : `${Math.floor(t.duration / 60) ? `${Math.floor(t.duration / 60)} h ` : ""}${t.duration % 60 ? `${t.duration % 60} min` : ""}`}</span>
+          <button className="btn danger" onClick={() => void saveTemplates(templates.filter((x) => x.id !== t.id))}>Eliminar</button>
+        </Row>
+      ))}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { addDaysZ, startOfDayZ, stepCursor, viewRange } from "./lib/dates";
 import { DEFAULT_EVENT_MINUTES } from "./lib/defaults";
 import { deleteOccurrence, editOccurrence, shiftWeekday, type Scope, type SeriesOps } from "./lib/series";
 import { completeTask } from "./lib/tasks";
+import { duplicateEvent, eventFromTemplate, type EventTemplate } from "./lib/templates";
 
 export type Editor =
   /** `master` y `occStart` solo cuando se edita una repetición de una serie. */
@@ -31,6 +32,11 @@ interface State {
   /** Contenido de un .ics pendiente de importar (doble clic en el Explorador). */
   pendingIcs: string | null;
   welcome: boolean;
+  templates: EventTemplate[];
+  saveTemplates(t: EventTemplate[]): Promise<void>;
+  openFromTemplate(t: EventTemplate): void;
+  /** Abre el editor de un evento nuevo copiado del que se está editando (sin guardar aún). */
+  duplicateDraft(draft: CalEvent): void;
 
   init(): Promise<void>;
   reload(kind?: string): Promise<void>;
@@ -92,6 +98,7 @@ export const useStore = create<State>((set, get) => ({
   searchFocus: 0,
   pendingIcs: null,
   welcome: false,
+  templates: [],
 
   async init() {
     try {
@@ -99,6 +106,7 @@ export const useStore = create<State>((set, get) => ({
       const view = settings.lastView as ViewMode | undefined;
       set({
         // (en pruebas automáticas no se enseña, salvo con ?welcome)
+        templates: Array.isArray(settings.templates) ? (settings.templates as EventTemplate[]) : [],
         welcome: (!settings.welcomed && !navigator.webdriver) || new URLSearchParams(location.search).has("welcome"),
         theme: (settings.theme as ThemePref) ?? "system",
         view: view && ["day", "week", "month", "year"].includes(view) ? view : "week",
@@ -304,6 +312,20 @@ export const useStore = create<State>((set, get) => ({
     if (!scope) return;
     const draft = { ...occ.event, start, end, rrule: shiftWeekday(occ.event, occ.start, start) };
     await applyOps(editOccurrence(occ.event, occ.start, draft, scope, newId), set, get);
+  },
+  async saveTemplates(templates) {
+    set({ templates });
+    await backend.setSetting("templates", templates);
+  },
+  openFromTemplate(t) {
+    const { cursor } = get();
+    const now = Date.now();
+    const base = startOfDayZ(cursor) === startOfDayZ(now) ? now : startOfDayZ(cursor) + 9 * 3600_000;
+    const start = Math.ceil(base / 3600_000) * 3600_000;
+    set({ editor: { kind: "event", isNew: true, event: eventFromTemplate(t, start, newId) } });
+  },
+  duplicateDraft(draft) {
+    set({ editor: { kind: "event", isNew: true, event: duplicateEvent(draft, newId) } });
   },
   openQuickAdd(open = true) {
     set({ quickAddOpen: open });

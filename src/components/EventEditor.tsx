@@ -7,6 +7,8 @@ import { shiftWeekday } from "../lib/series";
 import { RepeatEditor } from "./RepeatEditor";
 import { AlertsEditor } from "./AlertsEditor";
 import { useCloud } from "../cloud";
+import { templateFromEvent } from "../lib/templates";
+import { newId } from "../lib/backend";
 import { Modal } from "./Modal";
 import { DateInput, TimeInput } from "./DateTimeInputs";
 import { CalendarSelect, DeleteButton, Row, Switch } from "./fields";
@@ -52,6 +54,26 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
     setStartTime(time);
   };
 
+  const draft = (): CalEvent => ({
+    ...event,
+    title: title.trim() || "Nuevo evento",
+    calendarId,
+    allDay,
+    start: allDay ? startOfDayZ(start) : start,
+    end,
+    location: location.trim(),
+    notes,
+    alerts,
+    rrule: rule ? formatRRule(rule, allDay) : null,
+  });
+  const [savedTemplate, setSavedTemplate] = useState(false);
+  const saveAsTemplate = () => {
+    const { templates, saveTemplates } = useStore.getState();
+    const t = templateFromEvent(draft(), newId);
+    void saveTemplates([...templates.filter((x) => x.name !== t.name), t]);
+    setSavedTemplate(true);
+  };
+
   const submit = () => {
     if (invalid) return;
     void saveFromEditor({
@@ -69,7 +91,7 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
   };
 
   return (
-    <Modal onClose={closeEditor} title={isNew ? "Nuevo evento" : "Editar evento"}>
+    <Modal onClose={closeEditor} title={isNew ? "Nuevo evento" : "Editar evento"} width={500}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -78,6 +100,10 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
+          if (e.key.toLowerCase() === "d" && (e.ctrlKey || e.metaKey) && !invalid) {
+            e.preventDefault();
+            useStore.getState().duplicateDraft(draft());
+          }
         }}
       >
         <input className="f-title" autoFocus placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -112,6 +138,16 @@ export function EventEditor({ event, isNew, isOccurrence }: { event: CalEvent; i
         <div className="f-group">
           <input className="f-plain" placeholder="Ubicación" value={location} onChange={(e) => setLocation(e.target.value)} />
           <textarea className="f-plain" placeholder="Notas" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <div className="f-subactions">
+          {!isNew && (
+            <button type="button" className="link-btn" disabled={invalid} onClick={() => useStore.getState().duplicateDraft(draft())} title="Duplicar (Ctrl+D)">
+              Duplicar
+            </button>
+          )}
+          <button type="button" className="link-btn" disabled={invalid} onClick={saveAsTemplate} title="Para crear otros iguales desde el menú +">
+            {savedTemplate ? "Plantilla guardada ✓" : "Guardar como plantilla"}
+          </button>
         </div>
         <div className="f-actions">
           {!isNew &&

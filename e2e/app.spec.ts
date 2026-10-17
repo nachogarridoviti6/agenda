@@ -39,7 +39,7 @@ test("crear un evento arrastrando, editarlo y borrarlo", async ({ page }) => {
   await start.fill("12");
   await start.press("Tab");
   await expect(page.getByLabel("Hora").nth(1)).toHaveValue("13:30");
-  await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.locator(".ev", { hasText: "Examen Termodinámica" })).toContainText("12:00 – 13:30");
 
   // Borrar (pide confirmación)

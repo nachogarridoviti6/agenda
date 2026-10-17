@@ -15,6 +15,7 @@ const VIEWS: { id: ViewMode; label: string; key: string }[] = [
 
 export function Toolbar() {
   const view = useStore((s) => s.view);
+  const templates = useStore((s) => s.templates);
   const cursor = useStore((s) => s.cursor);
   const { setView, step, goToday, toggleSidebar, openNewEvent, openNewTask, openQuickAdd } = useStore.getState();
   const [menu, setMenu] = useState(false);
@@ -58,6 +59,17 @@ export function Toolbar() {
                 Nuevo evento <kbd>N</kbd>
               </button>
               <button onClick={() => { setMenu(false); openNewTask(); }}>Nueva tarea</button>
+              {templates.length > 0 && (
+                <>
+                  <div className="menu-sep" />
+                  <div className="menu-label">Plantillas</div>
+                  {templates.map((t) => (
+                    <button key={t.id} onClick={() => { setMenu(false); useStore.getState().openFromTemplate(t); }}>
+                      {t.name}
+                    </button>
+                  ))}
+                </>
+              )}
               <div className="menu-sep" />
               <button onClick={() => { setMenu(false); setSemester(true); }}>Horario del cuatrimestre…</button>
             </div>
