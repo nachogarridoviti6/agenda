@@ -116,3 +116,35 @@ test("tarea que se repite: al completarla salta a la siguiente fecha y queda en 
   await expect(page.locator(".task-row", { hasText: "Pagar alquiler" })).toHaveCount(2);
   await expect(page.locator(".task-group", { hasText: "Hechas" })).toBeVisible();
 });
+
+test("cambiar de mes con la rueda y de semana con gesto horizontal; tarea del widget se abre para editar", async ({ page, context }) => {
+  await quickAdd(page, "Comprar regalo hoy");
+  await page.keyboard.press("3");
+  const title = await page.locator(".tb-title").textContent();
+  const grid = page.locator(".month-grid");
+  await grid.hover();
+  await page.mouse.wheel(0, 120);
+  await expect(page.locator(".tb-title")).not.toHaveText(title!);
+  await page.waitForTimeout(400);
+  await page.mouse.wheel(0, -120);
+  await expect(page.locator(".tb-title")).toHaveText(title!);
+
+  await page.keyboard.press("2");
+  const week = await page.locator(".tg-dayhead").first().textContent();
+  await page.locator(".tg-scroll").hover();
+  await page.mouse.wheel(150, 0);
+  await expect(page.locator(".tg-dayhead").first()).not.toHaveText(week!);
+
+  // En la app: el lápiz abre la tarea
+  await page.locator(".task-row", { hasText: "Comprar regalo" }).hover();
+  await page.getByRole("button", { name: "Editar Comprar regalo" }).click();
+  await expect(page.getByPlaceholder("¿Qué hay que hacer?")).toHaveValue("Comprar regalo");
+  await page.keyboard.press("Escape");
+
+  // En el widget: pulsar el nombre abre el editor en la app (y no la marca como hecha)
+  const widget = await context.newPage();
+  await widget.goto("/widget.html");
+  await widget.locator(".w-task-main", { hasText: "Comprar regalo" }).click();
+  await expect(page.getByPlaceholder("¿Qué hay que hacer?")).toHaveValue("Comprar regalo");
+  await expect(widget.locator(".w-task", { hasText: "Comprar regalo" }).getByRole("checkbox")).not.toBeChecked();
+});

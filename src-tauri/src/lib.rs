@@ -382,6 +382,13 @@ async fn open_main(app: AppHandle, day: Option<i64>) {
     show_main(&app, day);
 }
 
+/// Desde el widget: abre la ventana principal con el editor de una tarea.
+#[tauri::command]
+async fn open_task(app: AppHandle, id: String) {
+    show_main(&app, None);
+    let _ = app.emit_to("main", "open-task", id);
+}
+
 /// Desde el widget: abre la ventana principal con "Añadir rápido".
 #[tauri::command]
 async fn open_quick_add(app: AppHandle) {
@@ -507,6 +514,7 @@ pub fn run() {
             list_monitors,
             open_main,
             open_quick_add,
+            open_task,
             get_autostart,
             set_autostart,
         ])

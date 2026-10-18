@@ -352,6 +352,8 @@ html.widget body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
+  cursor: pointer;
 }
 .w-task-title {
   overflow: hidden;

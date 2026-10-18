@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { swipeStep, WheelStepper, wheelPixels } from "./lib/gesture";
 import { useStore } from "./store";
 import type { Calendar } from "./lib/types";
 import { backend, isTauri } from "./lib/backend";
@@ -150,4 +151,53 @@ export function useCloudSync() {
       void off.then((f) => f());
     };
   }, [appleId]);
+}
+
+/**
+ * Navegar deslizando dentro de un elemento: rueda del ratón / panel táctil y dedo en pantallas
+ * táctiles. axis "y" (vista mes: abajo = siguiente) o "x" (semana/día: gesto horizontal, porque el
+ * vertical se usa para recorrer las horas).
+ */
+export function useSwipeNav(ref: RefObject<HTMLElement | null>, axis: "x" | "y", onStep: (dir: number) => void) {
+  const cb = useRef(onStep);
+  cb.current = onStep;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const stepper = new WheelStepper();
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return; // zoom
+      const dx = wheelPixels(e.deltaX, e.deltaMode);
+      const dy = wheelPixels(e.deltaY, e.deltaMode);
+      let delta: number;
+      if (axis === "y") delta = dy;
+      else if (Math.abs(dx) > Math.abs(dy)) delta = dx;
+      else if (e.shiftKey) delta = dy;
+      else return; // rueda vertical normal: deja recorrer las horas
+      if (axis === "x") e.preventDefault();
+      const step = stepper.feed(delta, e.timeStamp);
+      if (step) cb.current(step);
+    };
+    let start: { x: number; y: number; id: number } | null = null;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && e.isPrimary) start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!start || e.pointerId !== start.id) return;
+      const step = swipeStep(e.clientX - start.x, e.clientY - start.y, axis);
+      start = null;
+      if (step) cb.current(step);
+    };
+    const onCancel = () => (start = null);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onCancel);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onCancel);
+    };
+  }, [ref, axis]);
 }

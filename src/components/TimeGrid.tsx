@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
 import { useStore } from "../store";
-import { useCalendarMap, useNow } from "../hooks";
+import { useCalendarMap, useNow, useSwipeNav } from "../hooks";
 import { addDaysZ, atMinutes, dayKey, fmt, hm, isSameDayZ, minutesIntoDay } from "../lib/dates";
 import { expandEvents, tasksByDay } from "../lib/occurrences";
 import { isAllDayLike, layoutDay, layoutSpans } from "../lib/layout";
@@ -24,6 +24,8 @@ export function TimeGrid({ days }: { days: number[] }) {
   const calMap = useCalendarMap();
   const now = useNow();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useSwipeNav(rootRef, "x", (dir) => useStore.getState().step(dir));
   const colsRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -136,7 +138,7 @@ export function TimeGrid({ days }: { days: number[] }) {
   const hasAllDay = spans.lanes > 0 || maxTasks > 0;
 
   return (
-    <div className="timegrid">
+    <div className="timegrid" ref={rootRef}>
       <div className="tg-head" style={{ gridTemplateColumns: cols }}>
         <div />
         {days.map((d, i) => (

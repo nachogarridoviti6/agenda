@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useStore } from "../store";
-import { useCalendarMap, useNow } from "../hooks";
+import { useCalendarMap, useNow, useSwipeNav } from "../hooks";
 import { addDaysZ, dayKey, fmt, hm, isSameDayZ, monthGridDays } from "../lib/dates";
 import { expandEvents, tasksByDay } from "../lib/occurrences";
 import { occurrencesOnDay, sortOccurrences } from "../lib/layout";
@@ -13,10 +13,13 @@ export function MonthView() {
   const cursor = useStore((s) => s.cursor);
   const events = useStore((s) => s.events);
   const tasks = useStore((s) => s.tasks);
-  const { openEvent, openNewEvent, openTask, toggleTask, setCursor, setView } = useStore.getState();
+  const { openEvent, openNewEvent, openTask, toggleTask, setCursor, setView, step } = useStore.getState();
+  const navDir = useStore((s) => s.navDir);
   const calMap = useCalendarMap();
   const now = useNow(60_000);
   const gridRef = useRef<HTMLDivElement>(null);
+  const monthRef = useRef<HTMLDivElement>(null);
+  useSwipeNav(monthRef, "y", step);
   const [maxRows, setMaxRows] = useState(3);
 
   const days = useMemo(() => monthGridDays(cursor), [cursor]);
@@ -29,13 +32,15 @@ export function MonthView() {
 
   // Cuántas líneas caben en cada celda según el tamaño de la ventana.
   useLayoutEffect(() => {
-    const el = gridRef.current;
-    if (!el) return;
+    const root = monthRef.current;
+    if (!root) return;
     const ro = new ResizeObserver(() => {
+      const el = gridRef.current;
+      if (!el) return;
       const cellH = el.clientHeight / 6;
       setMaxRows(Math.max(1, Math.floor((cellH - 30) / ROW_H)));
     });
-    ro.observe(el);
+    ro.observe(root);
     return () => ro.disconnect();
   }, []);
 
@@ -45,13 +50,13 @@ export function MonthView() {
   };
 
   return (
-    <div className="month">
+    <div className="month" ref={monthRef}>
       <div className="month-head">
         {["lun", "mar", "mié", "jue", "vie", "sáb", "dom"].map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
-      <div className="month-grid" ref={gridRef}>
+      <div className={`month-grid slide-${navDir > 0 ? "up" : navDir < 0 ? "down" : "none"}`} ref={gridRef} key={month + fmt(cursor, "yyyy")}>
         {days.map((d) => {
           const dayOccs = sortOccurrences(occurrencesOnDay(occs, d));
           const dayTasks = taskMap.get(dayKey(d)) ?? [];

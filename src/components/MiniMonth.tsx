@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
-import { useNow } from "../hooks";
+import { useNow, useSwipeNav } from "../hooks";
 import { addMonthsZ, capitalize, fmt, isSameDayZ, monthGridDays, startOfMonthZ, startOfWeekZ } from "../lib/dates";
 import { ChevronLeft, ChevronRight } from "./icons";
 
@@ -12,13 +12,15 @@ export function MiniMonth() {
   const now = useNow(60_000);
   const [shown, setShown] = useState(startOfMonthZ(cursor));
   useEffect(() => setShown(startOfMonthZ(cursor)), [cursor]);
+  const ref = useRef<HTMLDivElement>(null);
+  useSwipeNav(ref, "y", (dir) => setShown((s) => addMonthsZ(s, dir)));
 
   const days = monthGridDays(shown);
   const month = fmt(shown, "M");
   const selWeek = startOfWeekZ(cursor);
 
   return (
-    <div className="mini">
+    <div className="mini" ref={ref}>
       <div className="mini-head">
         <span className="mini-title">{capitalize(fmt(shown, "MMMM yyyy"))}</span>
         <button className="icon-btn sm" onClick={() => setShown(addMonthsZ(shown, -1))} aria-label="Mes anterior">

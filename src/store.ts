@@ -25,6 +25,8 @@ interface State {
   cursor: number;
   editor: Editor;
   sidebarOpen: boolean;
+  /** Dirección del último cambio de página (para la animación). */
+  navDir: number;
   /** Pregunta "¿solo este o todos los futuros?" pendiente. */
   scopePrompt: { action: "save" | "delete"; resolve(scope: Scope | null): void } | null;
   quickAddOpen: boolean;
@@ -93,6 +95,7 @@ export const useStore = create<State>((set, get) => ({
   cursor: Date.now(),
   editor: null,
   sidebarOpen: true,
+  navDir: 0,
   scopePrompt: null,
   quickAddOpen: false,
   searchFocus: 0,
@@ -120,6 +123,12 @@ export const useStore = create<State>((set, get) => ({
         get().setCursor(day);
       });
       await backend.onQuickAdd(() => get().openQuickAdd(true));
+      // Pulsar una tarea en el widget la abre aquí para editarla.
+      await backend.onOpenTask(async (id) => {
+        await get().reload("tasks");
+        const t = get().tasks.find((x) => x.id === id);
+        if (t) get().openTask(t);
+      });
       // .ics abierto con doble clic: al arrancar o con la app ya abierta.
       const takeIcs = async () => {
         const text = await backend.takePendingIcs();
@@ -159,10 +168,13 @@ export const useStore = create<State>((set, get) => ({
     void get().reload("events");
   },
   goToday() {
+    const { cursor } = get();
+    set({ navDir: Date.now() > cursor ? 1 : -1 });
     get().setCursor(Date.now());
   },
   step(dir) {
     const { view, cursor } = get();
+    set({ navDir: dir });
     get().setCursor(stepCursor(view, cursor, dir));
   },
   toggleSidebar() {
@@ -181,7 +193,7 @@ export const useStore = create<State>((set, get) => ({
       // Por defecto: la próxima hora en punto del día seleccionado.
       const now = Date.now();
       const base = startOfDayZ(cursor) === startOfDayZ(now) ? now : startOfDayZ(cursor) + 9 * 3600_000;
-      start = Math.ceil(base / 3600_000) * 3600_000;
+      start = nextHourSameDay(base);
     }
     const allDay = opts.allDay ?? false;
     const end = opts.end ?? (allDay ? addDaysZ(startOfDayZ(start), 1) : start + DEFAULT_EVENT_MINUTES * 60_000);
@@ -321,7 +333,7 @@ export const useStore = create<State>((set, get) => ({
     const { cursor } = get();
     const now = Date.now();
     const base = startOfDayZ(cursor) === startOfDayZ(now) ? now : startOfDayZ(cursor) + 9 * 3600_000;
-    const start = Math.ceil(base / 3600_000) * 3600_000;
+    const start = nextHourSameDay(base);
     set({ editor: { kind: "event", isNew: true, event: eventFromTemplate(t, start, newId) } });
   },
   duplicateDraft(draft) {
@@ -418,3 +430,9 @@ async function applyOps(ops: SeriesOps, set: (p: Partial<State>) => void, get: (
   }
 }
 
+
+/** Siguiente hora en punto, sin pasar al día siguiente (a las 23:10 → 23:00 de hoy). */
+export function nextHourSameDay(ms: number): number {
+  const next = Math.ceil(ms / 3600_000) * 3600_000;
+  return startOfDayZ(next) === startOfDayZ(ms) ? next : Math.floor(ms / 3600_000) * 3600_000;
+}

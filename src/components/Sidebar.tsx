@@ -84,7 +84,7 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
             <div key={label}>
               <div className={`task-group ${label === "Atrasadas" ? "is-overdue" : ""}`}>{label}</div>
               {items.map((t) => (
-            <div key={t.id} className="task-row" style={{ "--c": calMap.get(t.calendarId)?.color } as CSSProperties} onClick={() => openTask(t)}>
+            <div key={t.id} className="task-row" style={{ "--c": calMap.get(t.calendarId)?.color } as CSSProperties} onClick={() => openTask(t)} title="Pulsa para editar">
               <input
                 type="checkbox"
                 className="check"
@@ -105,6 +105,9 @@ export function Sidebar({ onSettings }: { onSettings(): void }) {
                   </div>
                 )}
               </div>
+              <button className="icon-btn sm task-edit" aria-label={`Editar ${t.title}`} onClick={(e) => (e.stopPropagation(), openTask(t))}>
+                <Pencil width={12} height={12} />
+              </button>
             </div>
               ))}
             </div>

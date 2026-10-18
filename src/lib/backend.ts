@@ -57,6 +57,9 @@ export interface Backend {
   openApplePage(url: string): Promise<void>;
   /** Desde el widget: abre la app con "Añadir rápido". */
   openQuickAdd(): Promise<void>;
+  /** Desde el widget: abre la app con el editor de una tarea. */
+  openTaskInMain(id: Id): Promise<void>;
+  onOpenTask(cb: (id: Id) => void): Promise<() => void>;
   saveEvent(e: CalEvent): Promise<void>;
   /** Borra el evento y, si es una serie, también sus excepciones. */
   deleteEvent(id: Id): Promise<void>;
@@ -123,6 +126,11 @@ class TauriBackend implements Backend {
   openDataDir() { return this.call<void>("open_data_dir"); }
   openApplePage(url: string) { return this.call<void>("open_apple_page", { url }); }
   openQuickAdd() { return this.call<void>("open_quick_add"); }
+  openTaskInMain(id: Id) { return this.call<void>("open_task", { id }); }
+  async onOpenTask(cb: (id: Id) => void) {
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    return getCurrentWebviewWindow().listen<string>("open-task", (e) => cb(e.payload));
+  }
   saveEvent(event: CalEvent) { return this.call<void>("save_event", { event }); }
   deleteEvent(id: Id) { return this.call<void>("delete_event", { id }); }
   listTasks() { return this.call<Task[]>("list_tasks"); }
@@ -320,6 +328,14 @@ export class MockBackend implements Backend {
   async openDataDir() {}
   async openQuickAdd() {
     this.channel?.postMessage("quickadd:");
+  }
+  async openTaskInMain(id: Id) {
+    this.channel?.postMessage(`opentask:${id}`);
+  }
+  async onOpenTask(cb: (id: Id) => void) {
+    const l = (e: MessageEvent) => String(e.data).startsWith("opentask:") && cb(String(e.data).slice(9));
+    this.channel?.addEventListener("message", l);
+    return () => this.channel?.removeEventListener("message", l);
   }
   async openApplePage(url: string) {
     window.open(url, "_blank", "noopener");

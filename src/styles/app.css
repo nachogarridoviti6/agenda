@@ -1578,3 +1578,47 @@ kbd {
 .btn {
   white-space: nowrap;
 }
+
+.task-row {
+  cursor: pointer;
+}
+.task-edit {
+  opacity: 0;
+  flex: none;
+  margin-top: -2px;
+}
+.task-row:hover .task-edit {
+  opacity: 1;
+}
+
+/* Deslizar entre meses */
+.month-grid {
+  touch-action: none;
+}
+.month-grid.slide-up {
+  animation: slide-up 0.22s ease-out;
+}
+.month-grid.slide-down {
+  animation: slide-down 0.22s ease-out;
+}
+@keyframes slide-up {
+  from {
+    opacity: 0.3;
+    transform: translateY(24px);
+  }
+}
+@keyframes slide-down {
+  from {
+    opacity: 0.3;
+    transform: translateY(-24px);
+  }
+}
+.tg-scroll {
+  touch-action: pan-y;
+}
+@media (prefers-reduced-motion: reduce) {
+  .month-grid.slide-up,
+  .month-grid.slide-down {
+    animation: none;
+  }
+}

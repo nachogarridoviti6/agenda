@@ -132,16 +132,16 @@ export function Widget() {
           <div className="w-task-list">
             {week.tasks.length === 0 && <div className="w-empty">Todo hecho esta semana ✓</div>}
             {week.tasks.map((t) => (
-              <label key={t.id} className="w-task" style={{ "--c": colorOf.get(t.calendarId) } as CSSProperties} onDoubleClick={() => open(t.due ?? undefined)}>
-                <input type="checkbox" className="check" checked={t.completedAt != null} onChange={() => void toggle(t)} />
-                <span className="w-task-main">
+              <div key={t.id} className="w-task" style={{ "--c": colorOf.get(t.calendarId) } as CSSProperties}>
+                <input type="checkbox" className="check" checked={t.completedAt != null} onChange={() => void toggle(t)} aria-label={`Completar ${t.title}`} />
+                <span className="w-task-main" role="button" tabIndex={0} title="Abrir para editar" onClick={() => void backend.openTaskInMain(t.id)}>
                   <span className={`w-task-title ${t.completedAt ? "done" : ""}`}>
                     {t.title}
                     {t.rrule && <span className="w-repeat" title="Se repite"> ↻</span>}
                   </span>
                   <span className={`w-task-due ${isOverdue(t, now) ? "is-overdue" : ""}`}>{shortDue(t, now)}</span>
                 </span>
-              </label>
+              </div>
             ))}
           </div>
         </aside>

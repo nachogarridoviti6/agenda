@@ -17,7 +17,7 @@ Hecho con **Tauri 2** (Rust) + **React** + **TypeScript**. Los datos se guardan 
 ## Instalar (lo normal)
 
 1. Entra en **Releases** del repositorio (columna derecha en GitHub) y abre la versión más reciente.
-2. En **Assets**, descarga `Agenda_1.0.8_x64-setup.exe` y ábrelo.
+2. En **Assets**, descarga `Agenda_1.0.9_x64-setup.exe` y ábrelo.
 3. Si Windows SmartScreen avisa (el instalador no está firmado): **Más información → Ejecutar de todas formas**.
 4. El instalador, en español, se instala solo para tu usuario (no pide permisos de administrador) y crea Agenda en el menú Inicio.
 
@@ -40,11 +40,13 @@ Los datos se guardan en `%APPDATA%\com.nachogarrido.agenda\agenda.db` (⚙️ Aj
 | Nuevo evento | `N`, botón `+`, doble clic en un hueco o **arrastrar** en la rejilla |
 | Mover / cambiar duración | Arrastrar el evento / arrastrar su borde inferior |
 | Ir a hoy | `T` o botón **Hoy** |
-| Semana anterior / siguiente | `←` / `→` |
+| Semana anterior / siguiente | `←` / `→`, o deslizar en horizontal (dos dedos en el panel táctil o el dedo en la pantalla) |
+| Mes anterior / siguiente (vista Mes) | Rueda del ratón o deslizar hacia arriba/abajo |
 | Vista Día / Semana / Mes / Año | `1` / `2` / `3` / `4` |
 | Buscar | `Ctrl+F` o `/` (eventos y tareas, sin importar acentos) |
 | Nueva tarea | `+` de **Tareas** en la barra lateral, o menú `+` |
-| Completar tarea | Clic en su círculo (en la barra lateral o en el calendario) |
+| Completar tarea | Clic en su círculo (en la barra lateral, el calendario o el widget) |
+| Editar tarea | Clic en la tarea (o en el lápiz); en el widget, clic en su nombre abre la app |
 | Calendarios | Casilla para mostrar/ocultar, lápiz para renombrar, recolorear o borrar |
 | Tema claro/oscuro | ⚙️ abajo a la izquierda (por defecto sigue a Windows) |
 | Cerrar la ventana | La esconde: Agenda sigue en la bandeja (junto al reloj) con el widget |
